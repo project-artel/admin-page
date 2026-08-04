@@ -1,0 +1,42 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+*.tsbuildinfo
+
+# Local environment
+# 열거하면 .env.bak이나 편집기 스왑 파일 같은 파생 파일이 빠져나간다.
+# 전부 막고 예시 파일만 되살린다.
+.env*
+!.env.example
+
+# Agent tooling
+.claude/settings.local.json
+.claude/worktrees/
+.worktrees/
+
+# Local-only Jira credentials for the MCP server
+.jira.env
+
+# Local-only Notion credentials for the ntn CLI
+.notion.env
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

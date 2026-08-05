@@ -6,7 +6,7 @@ PR should let reviewer understand intent, verify evidence, and identify risk wit
 
 ## Before Opening
 
-- Confirm issue acceptance criteria.
+- Confirm acceptance criteria from the Jira issue or the user request.
 - Update plan to reflect final implementation.
 - Review full diff against default branch.
 - Remove debug code and unrelated churn.
@@ -30,6 +30,30 @@ Use Conventional Commit format, with the summary in Korean:
 <type>(<optional-scope>): <요약>
 ```
 
+## Assignee and Labels
+
+Every PR carries an assignee and exactly one type label. Set both when opening
+the PR rather than leaving them for review time.
+
+- Assignee: the PR author, unless another person owns the merge.
+- Label: derived from the Conventional Commit type in the title.
+
+| Title type | Label |
+| --- | --- |
+| `feat` | `enhancement` |
+| `fix` | `bug` |
+| `docs` | `documentation` |
+| `chore` | `chore` |
+| `refactor` | `refactor` |
+| `infra` | `infra` |
+
+```bash
+gh pr create --assignee @me --label enhancement ...
+```
+
+Create the label in the repository when it does not exist yet. Do not
+substitute a label that carries a different meaning.
+
 ## Body Template
 
 ```markdown
@@ -44,7 +68,7 @@ Use Conventional Commit format, with the summary in Korean:
 
 ## Rollback
 
-Closes #123
+Jira: ARTEL-123 (omit when no Jira work item exists)
 ```
 
 ## Safe Creation

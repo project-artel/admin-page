@@ -12,11 +12,14 @@ Fill this document during project initialization. Agents must verify commands ag
 ## Architecture
 
 - Entry points: `index.html`, `src/main.tsx`
-- Main modules: `src/`
-- Dependency direction: TODO
-- External systems: GitHub repository `project-artel/admin-page`; Jira project `ARTEL` via the
-  `mcp-atlassian` MCP server
-- Persistent data: TODO
+- Main modules: `src/api` (orchestration client), `src/auth` (session boundary), `src/projects`,
+  `src/qaStats` (QA run-config dashboard)
+- Dependency direction: feature modules depend on `src/api`; `src/api` depends on nothing local
+- External systems: artel-orchestration-server REST API (`VITE_ORCHESTRATION_URL`), artel-home for
+  the OAuth login flow (`VITE_HOME_URL`), GitHub repository `project-artel/admin-page`, and Jira
+  project `ARTEL` via the `mcp-atlassian` MCP server
+- Persistent data: none. Session lives in orchestration cookies; the theme is in `localStorage`
+  under `artel-theme`, shared with artel-home
 
 ## Commands
 
@@ -26,8 +29,8 @@ Fill this document during project initialization. Agents must verify commands ag
 | Run locally | `npm run dev` (port 5174) |
 | Format | TODO |
 | Lint | `npm run lint` |
-| Type-check | `npx tsc -b` |
-| Unit tests | TODO |
+| Type-check | `npm run typecheck` |
+| Unit tests | `npm test` (vitest) |
 | Integration tests | TODO |
 | Build | `npm run build` |
 | Set up Jira credentials | `cp .jira.env.example .jira.env` |

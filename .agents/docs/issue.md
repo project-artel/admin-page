@@ -13,6 +13,9 @@ An issue is ready when it has:
 - known constraints
 - explicit non-goals when scope could expand
 - dependencies or blockers
+- an assignee, an existing Epic (상위 항목), and the 작업 유형 and 레포지토리 fields set
+- an explicit assignee accountId for the person responsible; do not leave ownership to a branch or PR author
+- an Epic selected from the repository and work domain before branch creation; do not leave an 일반 작업 without a parent
 
 ## Issue Template
 
@@ -31,30 +34,15 @@ An issue is ready when it has:
 ## Validation Notes
 ```
 
-## Safe Creation
-
-Write generated issue content to a Markdown file before invoking GitHub CLI.
-Pass the file with `--body-file`; do not interpolate multiline content into
-`--body`. This prevents shell quoting, command substitution, and newline damage.
-
-Use a temporary file unless the repository requires the issue draft to be
-tracked:
-
-```bash
-gh issue create --title "<title>" --body-file /tmp/issue-body.md
-```
-
-After creation, read the remote issue back with `gh issue view` and confirm the
-title and body match the source file. Fix the remote issue before continuing if
-content is missing, truncated, or malformed. Remove temporary files after
-successful verification.
-
 ## Lifecycle
 
 1. Create or refine issue.
 2. Confirm dependencies and priority.
-3. Mark in progress only when active work starts.
-4. Link branch, plan, and PR.
+3. Mark in progress only when active work starts. In repositories wired for it,
+   this transition triggers the branch automation described in `workflow.md`;
+   confirm the branch appeared, and create it manually when it did not.
+4. Link branch, plan, and PR. The branch name carries the issue key, which is
+   what ties commits and the PR back to this issue.
 5. Update scope changes in issue before implementing them.
 6. Close only after acceptance criteria and required validation pass.
 

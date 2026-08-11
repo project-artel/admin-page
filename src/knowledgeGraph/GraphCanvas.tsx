@@ -1,4 +1,4 @@
-import { useId, type KeyboardEvent } from 'react'
+import { useId, useMemo, type KeyboardEvent } from 'react'
 import { edgeGeometry, NODE_RADIUS, type GraphLayout, type RoutedEdge } from './layout'
 import {
   relationStyle,
@@ -9,6 +9,7 @@ import {
   type KnowledgeGraphNode,
   type NodeShape,
 } from './knowledgeGraphTypes'
+import { placeLabels, type LabelPlacement } from './labelPlacement'
 import { truncate } from './text'
 
 /**
@@ -19,7 +20,14 @@ import { truncate } from './text'
  * 맡는다.
  */
 const LABEL_LIMIT = 30
+/** 라벨 폭 예산. 라틴 문자 기준이라 한글로는 그 절반쯤이다. */
 const LABEL_CHARS = 14
+
+/** `.graph__node-label` 크기에서 라틴 문자 한 글자가 그려지는 폭. */
+const LABEL_UNIT_WIDTH = 6
+
+/** 라벨 한 줄의 높이. */
+const LABEL_LINE_HEIGHT = 13
 
 /**
  * 그래프 그림판.
@@ -45,6 +53,31 @@ export function GraphCanvas({
   // 한 페이지에 그래프가 둘 이상 올라와도 화살촉 정의가 부딪히지 않게 접두사를 붙인다.
   const markerPrefix = useId().replace(/:/g, '')
   const showLabels = layout.nodes.length <= LABEL_LIMIT
+
+  // 라벨은 자르기만으로 부족하다. 자기 예산에 맞는 라벨도 옆 노드 라벨 위에 앉을 수 있어서,
+  // 실제로 요약이 서로 겹쳐 아무것도 안 읽히는 상태가 됐다. 그래서 라벨도 배치한다 —
+  // 아래가 막히면 위로, 둘 다 막히면 버린다. 버려도 노드는 그대로 클릭되고 전문은 상세에 있다.
+  const labels = useMemo(() => {
+    if (!showLabels) return new Map<string, LabelPlacement>()
+    const degree = new Map<string, number>()
+    for (const routed of layout.edges) {
+      degree.set(routed.edge.from, (degree.get(routed.edge.from) ?? 0) + 1)
+      degree.set(routed.edge.to, (degree.get(routed.edge.to) ?? 0) + 1)
+    }
+    const keep = new Set<string>()
+    if (selection?.kind === 'node') keep.add(selection.id)
+    return placeLabels(
+      layout.nodes,
+      (positioned) => truncate(positioned.node.summary ?? '요약 없음', LABEL_CHARS),
+      {
+        unitWidth: LABEL_UNIT_WIDTH,
+        lineHeight: LABEL_LINE_HEIGHT,
+        widthLimit: LABEL_CHARS,
+        keep,
+        degree: (id) => degree.get(id) ?? 0,
+      },
+    )
+  }, [layout.edges, layout.nodes, selection, showLabels])
 
   return (
     <div className="graph__frame">
@@ -94,7 +127,7 @@ export function GraphCanvas({
               node={positioned.node}
               x={positioned.x}
               y={positioned.y}
-              showLabel={showLabels}
+              label={labels.get(positioned.node.id) ?? null}
               selected={selection?.kind === 'node' && selection.id === positioned.node.id}
               onSelect={onSelect}
             />
@@ -150,14 +183,14 @@ function NodeMark({
   node,
   x,
   y,
-  showLabel,
+  label,
   selected,
   onSelect,
 }: {
   node: KnowledgeGraphNode
   x: number
   y: number
-  showLabel: boolean
+  label: LabelPlacement | null
   selected: boolean
   onSelect: (next: GraphSelection) => void
 }) {
@@ -183,9 +216,10 @@ function NodeMark({
       <title>{summary}</title>
       {selected && <circle className="graph__node-halo" cx={x} cy={y} r={NODE_RADIUS + 5} />}
       <NodeShapeMark shape={shape} x={x} y={y} />
-      {(showLabel || selected) && (
-        <text className="graph__node-label" x={x} y={y + NODE_RADIUS + 13} textAnchor="middle">
-          {truncate(summary, LABEL_CHARS)}
+      {label !== null && (
+        // y 오프셋은 배치가 정한다 — 아래에 자리가 없던 라벨은 노드 위에 그려진다.
+        <text className="graph__node-label" x={x} y={y + label.y} textAnchor="middle">
+          {label.text}
         </text>
       )}
     </g>

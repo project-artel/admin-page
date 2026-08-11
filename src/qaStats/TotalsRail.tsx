@@ -1,5 +1,7 @@
 import { CompletionRate } from './CompletionRate'
-import { formatCost, formatCount, formatDuration, formatTokens } from './format'
+import { ScoreRate } from './ScoreRate'
+import { formatCost, formatCount, formatDuration, formatRate, formatTokens } from './format'
+import { scoreCoverage, stepPassRate, verdictCoverage } from './pivot'
 import type { QaStatsTotals } from './qaStatsTypes'
 
 /**
@@ -28,6 +30,34 @@ export function TotalsRail({ total }: { total: QaStatsTotals }) {
         {/* 통과율이 아니다. qa_try.status는 런 생명주기이지 QA 판정이 아니다. */}
         <span className="rail__hint">
           완주 {formatCount(total.completed)} · 실패 {formatCount(total.failed)}
+        </span>
+      </div>
+      <div className="rail__item">
+        <span className="rail__label">스텝 합격률</span>
+        <span className="rail__value">
+          <ScoreRate
+            rate={stepPassRate(total)}
+            detail={`통과 ${total.stepsPassed} / 스텝 ${total.stepsTotal}`}
+          />
+        </span>
+        {/* 이 비율의 분모를 같은 칸에 둔다. 판정을 못 받은 런이 빠진 값이라, 커버리지 없이는
+            "깔끔하게 끝난 런"에만 조건부라는 사실이 화면에서 사라진다. */}
+        <span className="rail__hint">
+          판정 커버리지 {formatRate(verdictCoverage(total))} · 런 {formatCount(total.verdictKnown)}/
+          {formatCount(total.runs)}
+        </span>
+      </div>
+      <div className="rail__item">
+        <span className="rail__label">미탐 / 오탐</span>
+        {/* 두 방향을 한 숫자로 접지 않는다. 미탐(실패해야 할 것을 통과라 함)이 훨씬 나쁘고,
+            스칼라 하나로 접으면 두 종류의 나쁜 설정이 같은 점수로 보인다. */}
+        <span className="rail__value" title={`미탐 ${total.miss}건 · 오탐 ${total.falseAlarm}건`}>
+          {formatCount(total.miss)} / {formatCount(total.falseAlarm)}
+        </span>
+        <span className="rail__hint">
+          {total.scoredRuns === 0
+            ? '기대 라벨로 채점된 런 없음'
+            : `채점 커버리지 ${formatRate(scoreCoverage(total))} · 미보고 ${formatCount(total.unreported)}`}
         </span>
       </div>
       <div className="rail__item">

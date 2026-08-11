@@ -68,6 +68,23 @@ function parseTotals(raw: Record<string, unknown>): QaStatsTotals {
     costUsd: asNullableNumber(raw.costUsd),
     llmCalls: asNumber(raw.llmCalls, 0),
     avgCompletedDurationMs: asNullableNumber(raw.avgCompletedDurationMs),
+    // 판정과 채점은 서버가 이미 합계로 준다(평균이 아니다). 여기서 비율로 접지 않는 이유도 같다 —
+    // 비율만 들고 있으면 그것이 몇 개의 런 위에 얹힌 값인지가 파싱 시점에 사라진다.
+    //
+    // 기본값 0은 "서버가 이 필드를 아직 안 준다"까지 덮는다. 그래도 안전한 것은 커버리지
+    // (verdictKnown / scoredRuns)도 함께 0이 되어 화면이 비율을 그리지 않고 "판정 없음"으로
+    // 떨어지기 때문이다. 합계만 0으로 떨어뜨리고 분모를 살려 두면 그때가 "점수 0"이 된다.
+    verdictKnown: asNumber(raw.verdictKnown, 0),
+    stepsTotal: asNumber(raw.stepsTotal, 0),
+    stepsPassed: asNumber(raw.stepsPassed, 0),
+    casesTotal: asNumber(raw.casesTotal, 0),
+    casesPassed: asNumber(raw.casesPassed, 0),
+    scoredRuns: asNumber(raw.scoredRuns, 0),
+    correctPass: asNumber(raw.correctPass, 0),
+    falseAlarm: asNumber(raw.falseAlarm, 0),
+    miss: asNumber(raw.miss, 0),
+    correctFail: asNumber(raw.correctFail, 0),
+    unreported: asNumber(raw.unreported, 0),
   }
 }
 

@@ -37,6 +37,43 @@ export interface QaStatsCell {
   costUsd: number | null
   llmCalls: number
   avgCompletedDurationMs: number | null
+
+  /**
+   * 자기채점 판정을 받은 런 수. 아래 네 합계의 분모다.
+   *
+   * `runs`와의 차이가 판정을 **모르는** 런이고, 그것은 0점인 런과 다르다 — 소켓 사망이나 취소로
+   * 요약 없이 끝난 런이 여기 빠진다. 이 값을 보지 않고 합격률을 그리면 그 비율은 "깔끔하게 끝난
+   * 런"에만 조건부이고, **잘 죽는 설정일수록 자기 최악 런이 빠져 편향 크기가 축마다 다르다.**
+   */
+  verdictKnown: number
+  stepsTotal: number
+  stepsPassed: number
+  casesTotal: number
+  casesPassed: number
+
+  /**
+   * 기대-라벨 채점(`grader='expected-steps'`)을 받은 런 수. 아래 다섯 합계의 분모다.
+   *
+   * `verdictKnown`과 **다른 수다**: 요약은 멀쩡히 받았지만 시나리오에 기대 라벨이 하나도 없어
+   * 채점 대상이 아닌 런이 있다. 0이면 아래 다섯도 전부 0인데 그것은 "채점할 것이 없었다"이지
+   * "0점"이 아니다.
+   */
+  scoredRuns: number
+  /** 통과해야 했고 통과라 보고한 스텝 수. */
+  correctPass: number
+  /** 통과해야 했는데 실패라 보고한 스텝 수(오탐). */
+  falseAlarm: number
+  /**
+   * 실패해야 했는데 통과라 보고한 스텝 수(미탐).
+   *
+   * `falseAlarm`과 한 숫자로 접지 않는다 — QA 에이전트에게 미탐이 훨씬 나쁘다(못 찾은 버그는
+   * 출시된다). 스칼라 하나로 접으면 그 방향이 사라져 두 종류의 나쁜 모델이 같은 점수로 보인다.
+   */
+  miss: number
+  /** 실패해야 했고 실패라 보고한 스텝 수. */
+  correctFail: number
+  /** 라벨은 있는데 그 스텝 판정이 오지 않은 수. 일치도 불일치도 아닌 세 번째 상태다. */
+  unreported: number
 }
 
 /** 축이 없는 전체 합계. 자르기 전 전체에서 나오므로 셀의 합보다 클 수 있다. */

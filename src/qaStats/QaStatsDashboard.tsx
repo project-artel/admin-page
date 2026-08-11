@@ -4,6 +4,7 @@ import { listProjects, type ProjectSummary } from '../projects/projectsApi'
 import { AxisBreakdown } from './AxisBreakdown'
 import { CombinationMatrix } from './CombinationMatrix'
 import { RecentRuns } from './RecentRuns'
+import { ScoreBreakdown } from './ScoreBreakdown'
 import { TotalsRail } from './TotalsRail'
 import { toDateInputValue } from './format'
 import { fetchQaStats, fetchRecentQaTries } from './qaStatsApi'
@@ -193,7 +194,8 @@ export function QaStatsDashboard({ onSessionLost }: { onSessionLost: () => void 
             {data.stats.truncated && (
               <div className="notice" role="status">
                 조합이 {data.stats.cellLimit}개를 넘어 일부가 잘렸습니다. 아래 표의 합은 위 총계보다
-                작습니다. 기간을 좁히면 전체가 들어옵니다.
+                작고, 여기에는 <strong>미탐·오탐과 커버리지도 포함됩니다</strong> — 잘린 조합의
+                미탐은 아래 어느 표에도 나타나지 않습니다. 기간을 좁히면 전체가 들어옵니다.
               </div>
             )}
 
@@ -215,6 +217,7 @@ export function QaStatsDashboard({ onSessionLost }: { onSessionLost: () => void 
               </div>
             </section>
 
+            <ScoreBreakdown cells={cells} />
             <CombinationMatrix cells={cells} />
             <RecentRuns runs={data.runs} />
           </>

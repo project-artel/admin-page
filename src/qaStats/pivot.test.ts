@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { breakdown, completionRate, matrix, sumCells } from './pivot'
+import {
+  breakdown,
+  casePassRate,
+  completionRate,
+  falseAlarmRate,
+  matrix,
+  missRate,
+  scoreCoverage,
+  stepPassRate,
+  sumCells,
+  unreportedRate,
+  verdictCoverage,
+} from './pivot'
 import type { QaStatsCell } from './qaStatsTypes'
 
 /**
@@ -28,6 +40,17 @@ function cell(overrides: Partial<QaStatsCell>): QaStatsCell {
     costUsd: null,
     llmCalls: 0,
     avgCompletedDurationMs: null,
+    verdictKnown: 0,
+    stepsTotal: 0,
+    stepsPassed: 0,
+    casesTotal: 0,
+    casesPassed: 0,
+    scoredRuns: 0,
+    correctPass: 0,
+    falseAlarm: 0,
+    miss: 0,
+    correctFail: 0,
+    unreported: 0,
     ...overrides,
   }
 }
@@ -68,6 +91,91 @@ describe('sumCells', () => {
 
   it('완주한 런이 없으면 평균 소요는 null이다', () => {
     expect(sumCells([cell({ runs: 3, failed: 3 })]).avgCompletedDurationMs).toBeNull()
+  })
+})
+
+describe('coverage', () => {
+  it('판정 커버리지와 채점 커버리지가 서로 다른 수다', () => {
+    // 요약은 받았지만 시나리오에 기대 라벨이 없어 채점 대상이 아닌 런이 있다. 하나로 합치면
+    // "라벨을 안 달아서 점수가 없다"와 "런이 죽어서 점수가 없다"가 섞인다.
+    const row = cell({ runs: 10, verdictKnown: 8, scoredRuns: 3 })
+    expect(verdictCoverage(row)).toBeCloseTo(0.8)
+    expect(scoreCoverage(row)).toBeCloseTo(0.3)
+  })
+
+  it('런이 없으면 커버리지는 0%가 아니라 null이다', () => {
+    expect(verdictCoverage(cell({}))).toBeNull()
+    expect(scoreCoverage(cell({}))).toBeNull()
+  })
+})
+
+describe('pass rates', () => {
+  it('판정을 아는 런이 없으면 합격률은 null이다', () => {
+    // 0%로 쓰면 "전부 실패"와 같은 글자가 되고, 잘 죽는 설정이 최악으로 과대평가된다.
+    expect(stepPassRate(cell({ runs: 4, verdictKnown: 0 }))).toBeNull()
+    expect(casePassRate(cell({ runs: 4, verdictKnown: 0 }))).toBeNull()
+  })
+
+  it('case_id 없이 저작된 시나리오만 돌면 TC 합격률이 null이다', () => {
+    // 스텝은 쟀지만 TC는 잴 것이 없었다. 0%가 아니다.
+    const row = cell({ runs: 1, verdictKnown: 1, stepsTotal: 5, stepsPassed: 4 })
+    expect(stepPassRate(row)).toBeCloseTo(0.8)
+    expect(casePassRate(row)).toBeNull()
+  })
+})
+
+describe('confusion matrix rates', () => {
+  it('미탐과 오탐이 서로 다른 분모를 쓴다', () => {
+    // 실패 기대 2개 중 1개를 놓쳤고, 통과 기대 8개 중 1개를 잘못 실패라 했다. 같은 분모로
+    // 나누면 미탐률이 구조적으로 작아 보이고, 실패 기대 스텝이 적은 시나리오가 정확히 이
+    // 지표가 필요한 경우다.
+    const row = cell({ correctPass: 7, falseAlarm: 1, miss: 1, correctFail: 1 })
+    expect(missRate(row)).toBeCloseTo(0.5)
+    expect(falseAlarmRate(row)).toBeCloseTo(0.125)
+  })
+
+  it('미보고 스텝이 두 비율의 분모에 들지 않는다', () => {
+    // 방향조차 알 수 없는 스텝이다. 어느 쪽에 넣어도 그 방향을 지어내는 것이 된다.
+    const row = cell({ correctPass: 1, falseAlarm: 0, miss: 0, correctFail: 1, unreported: 8 })
+    expect(missRate(row)).toBeCloseTo(0)
+    expect(falseAlarmRate(row)).toBeCloseTo(0)
+    expect(unreportedRate(row)).toBeCloseTo(0.8)
+  })
+
+  it('그 방향의 기대 스텝이 없으면 0%가 아니라 null이다', () => {
+    // 실패 기대 스텝이 하나도 없는 시나리오는 "전부 통과"라 답하는 모델을 걸러내지 못한다.
+    // 그 사실을 0%(완벽)로 쓰면 정확히 반대로 읽힌다.
+    const lenientScenario = cell({ correctPass: 5, falseAlarm: 0, miss: 0, correctFail: 0 })
+    expect(missRate(lenientScenario)).toBeNull()
+    expect(falseAlarmRate(lenientScenario)).toBeCloseTo(0)
+  })
+
+  it('채점 대상 스텝이 없으면 미보고율도 null이다', () => {
+    expect(unreportedRate(cell({ runs: 3 }))).toBeNull()
+  })
+})
+
+describe('sumCells with scores', () => {
+  it('셀을 접어도 판정과 채점의 분모가 함께 따라온다', () => {
+    const summed = sumCells([
+      cell({ runs: 2, verdictKnown: 2, stepsTotal: 10, stepsPassed: 8, scoredRuns: 1, miss: 1, correctFail: 1 }),
+      cell({ runs: 3, verdictKnown: 1, stepsTotal: 5, stepsPassed: 5, scoredRuns: 0 }),
+    ])
+    expect(summed.runs).toBe(5)
+    expect(summed.verdictKnown).toBe(3)
+    expect(summed.scoredRuns).toBe(1)
+    expect(stepPassRate(summed)).toBeCloseTo(13 / 15)
+    // 합격률은 다섯 런이 아니라 세 런 위에 얹혀 있다. 이 값이 같이 따라오지 않으면 그 사실이
+    // 접는 순간 사라진다.
+    expect(verdictCoverage(summed)).toBeCloseTo(0.6)
+    expect(missRate(summed)).toBeCloseTo(0.5)
+  })
+
+  it('점수가 없는 셀이 접기에서 사라지지 않는다', () => {
+    // 사라지면 셀 합이 총계와 어긋나고, 화면에는 그 차이를 설명할 자리가 없다.
+    const summed = sumCells([cell({ runs: 4 }), cell({ runs: 1, scoredRuns: 1, correctPass: 2 })])
+    expect(summed.runs).toBe(5)
+    expect(scoreCoverage(summed)).toBeCloseTo(0.2)
   })
 })
 

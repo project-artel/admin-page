@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from 'react'
 import { ApiError, UnauthorizedError } from '../api/orchestration'
 import { listProjects, type ProjectSummary } from '../projects/projectsApi'
+import { applyTheme, type Theme } from '../theme'
 import { AxisBreakdown } from './AxisBreakdown'
 import { CombinationMatrix } from './CombinationMatrix'
 import { RecentRuns } from './RecentRuns'
@@ -237,17 +238,16 @@ export function QaStatsDashboard({
   )
 }
 
-/** artel-home과 같은 저장 키. 두 사이트 사이에서 테마가 뒤집히면 같은 제품으로 읽히지 않는다. */
+/** 저장은 artel-home과 공유하는 쿠키로 간다. src/theme.ts 참고. */
 export function ThemeToggle() {
-  const [theme, setTheme] = useState<'light' | 'dark'>(
-    () => (document.documentElement.dataset.theme as 'light' | 'dark') ?? 'light',
+  const [theme, setTheme] = useState<Theme>(
+    () => (document.documentElement.dataset.theme as Theme) ?? 'light',
   )
 
   const toggle = () => {
     const next = theme === 'dark' ? 'light' : 'dark'
     setTheme(next)
-    document.documentElement.dataset.theme = next
-    localStorage.setItem('artel-theme', next)
+    applyTheme(next)
   }
 
   return (

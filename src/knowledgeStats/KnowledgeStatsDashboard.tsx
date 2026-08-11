@@ -1,18 +1,20 @@
 import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from 'react'
 import { ApiError, UnauthorizedError } from '../api/orchestration'
 import { listProjects, type ProjectSummary } from '../projects/projectsApi'
-import { AxisBreakdown } from './AxisBreakdown'
-import { CombinationMatrix } from './CombinationMatrix'
-import { RecentRuns } from './RecentRuns'
-import { ScoreBreakdown } from './ScoreBreakdown'
-import { TotalsRail } from './TotalsRail'
-import { toDateInputValue } from './format'
-import { fetchQaStats, fetchRecentQaTries } from './qaStatsApi'
-import { AXES, type QaStats, type QaTrySummary } from './qaStatsTypes'
-import './dashboard.css'
+import { toDateInputValue } from '../qaStats/format'
+import { ThemeToggle } from '../qaStats/QaStatsDashboard'
+import { KnowledgeAxisBreakdown } from './AxisBreakdown'
+import { KnowledgeTotalsRail } from './TotalsRail'
+import { fetchKnowledgeStats } from './knowledgeStatsApi'
+import { AXES, type KnowledgeStats } from './knowledgeStatsTypes'
+import '../qaStats/dashboard.css'
 
-const RECENT_RUN_COUNT = 30
-const DEFAULT_WINDOW_DAYS = 30
+/**
+ * QA 집계(30일)보다 넓다. 지식은 만들어진 뒤 후속 런이 지우거나 인용해야 신호가 생기는데 그
+ * 후속 런은 같은 날 돌지 않는다. 좁게 자르면 창 끝자락의 지식이 평가받을 시간을 갖지 못한 채
+ * "아직 아무도 안 지웠다"로 집계된다. 서버 기본값과 같은 값이다.
+ */
+const DEFAULT_WINDOW_DAYS = 90
 
 /** 로컬 달력 기준 자정. 기간 경계를 UTC로 자르면 한국에서 하루가 밀린다. */
 function startOfDay(date: Date): Date {
@@ -27,17 +29,11 @@ function addDays(date: Date, days: number): Date {
   return copy
 }
 
-interface Loaded {
-  stats: QaStats
-  runs: QaTrySummary[]
-}
-
-export function QaStatsDashboard({
+export function KnowledgeStatsDashboard({
   onSessionLost,
   nav,
 }: {
   onSessionLost: () => void
-  /** 화면 전환 탭. 대시보드가 자기 topbar를 가지고 있어 여기로 받아 끼운다. */
   nav?: ReactNode
 }) {
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null)
@@ -45,7 +41,7 @@ export function QaStatsDashboard({
   // `to`는 배타 경계라 "오늘까지"는 내일 자정이다.
   const [to, setTo] = useState(() => addDays(startOfDay(new Date()), 1))
   const [from, setFrom] = useState(() => addDays(startOfDay(new Date()), -DEFAULT_WINDOW_DAYS))
-  const [data, setData] = useState<Loaded | null>(null)
+  const [data, setData] = useState<KnowledgeStats | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [reloadToken, setReloadToken] = useState(0)
@@ -87,12 +83,9 @@ export function QaStatsDashboard({
     setLoading(true)
     setError(null)
 
-    Promise.all([
-      fetchQaStats({ projectId, from, to }, controller.signal),
-      fetchRecentQaTries(projectId, RECENT_RUN_COUNT, controller.signal),
-    ])
-      .then(([stats, runs]) => {
-        setData({ stats, runs })
+    fetchKnowledgeStats({ projectId, from, to }, controller.signal)
+      .then((stats) => {
+        setData(stats)
         setLoading(false)
       })
       .catch((cause) => {
@@ -105,12 +98,12 @@ export function QaStatsDashboard({
     return () => controller.abort()
   }, [projectId, from, to, reloadToken, fail])
 
-  const cells = useMemo(() => data?.stats.cells ?? [], [data])
+  const cells = useMemo(() => data?.cells ?? [], [data])
 
   return (
     <div className="shell">
       <header className="topbar">
-        <h1 className="topbar__brand">ARTEL Admin · QA 실행 설정</h1>
+        <h1 className="topbar__brand">ARTEL Admin · 지식창고</h1>
         {nav}
 
         <span className="field">
@@ -197,62 +190,49 @@ export function QaStatsDashboard({
 
         {data !== null && (
           <>
-            <TotalsRail total={data.stats.total} />
+            <KnowledgeTotalsRail total={data.total} />
 
-            {data.stats.truncated && (
+            {data.truncated && (
               <div className="notice" role="status">
-                조합이 {data.stats.cellLimit}개를 넘어 일부가 잘렸습니다. 아래 표의 합은 위 총계보다
-                작고, 여기에는 <strong>미탐·오탐과 커버리지도 포함됩니다</strong> — 잘린 조합의
-                미탐은 아래 어느 표에도 나타나지 않습니다. 기간을 좁히면 전체가 들어옵니다.
+                조합이 {data.cellLimit}개를 넘어 일부가 잘렸습니다. 아래 표의 합은 위 총계보다
+                작습니다. 기간을 좁히면 전체가 들어옵니다.
               </div>
             )}
 
-            <section aria-labelledby="axes-title">
+            {/*
+              인용 판정이 한 건도 없는 기간에는 인용률 칸이 전부 미상이다. 그 상태를 설명하지
+              않으면 "지식을 아무도 안 쓴다"로 읽힌다 — 실제로는 인용 보고 기능이 붙기 전 런만
+              모여 있다는 뜻이다.
+            */}
+            {data.total.retrievalTotal > 0 && data.total.citationKnownTotal === 0 && (
+              <div className="notice" role="status">
+                이 기간의 검색은 인용 여부를 알 수 없습니다. 인용률이 0%가 아니라 미상으로 나오는
+                이유이며, 인용 보고를 하는 런이 쌓이면 채워집니다.
+              </div>
+            )}
+
+            <section aria-labelledby="knowledge-axes-title">
               <div className="section__head">
-                <h2 className="section__title" id="axes-title">
+                <h2 className="section__title" id="knowledge-axes-title">
                   축별 분해
                 </h2>
-                {/* 이 화면에서 가장 오해받기 쉬운 숫자라 제목 옆에 못박는다. */}
+                {/* 이 화면에서 가장 오해받기 쉬운 두 숫자라 제목 옆에 못박는다. */}
                 <span className="section__note">
-                  완주율은 QA 통과율이 아니라 런이 끝까지 돌았는지의 비율. 진행 중·취소는 분모에서
-                  제외
+                  후속 런이 지운 비율에는 수리와 폐기가 섞여 있음 · 인용률의 분모는 검색 노출이
+                  아니라 인용 판정이 가능했던 검색
                 </span>
               </div>
               <div className="axis-grid">
                 {AXES.map((axis) => (
-                  <AxisBreakdown key={axis} axis={axis} cells={cells} />
+                  <KnowledgeAxisBreakdown key={axis} axis={axis} cells={cells} />
                 ))}
               </div>
             </section>
-
-            <ScoreBreakdown cells={cells} />
-            <CombinationMatrix cells={cells} />
-            <RecentRuns runs={data.runs} />
           </>
         )}
 
         {data === null && loading && <div className="notice">집계를 불러오는 중입니다…</div>}
       </main>
     </div>
-  )
-}
-
-/** artel-home과 같은 저장 키. 두 사이트 사이에서 테마가 뒤집히면 같은 제품으로 읽히지 않는다. */
-export function ThemeToggle() {
-  const [theme, setTheme] = useState<'light' | 'dark'>(
-    () => (document.documentElement.dataset.theme as 'light' | 'dark') ?? 'light',
-  )
-
-  const toggle = () => {
-    const next = theme === 'dark' ? 'light' : 'dark'
-    setTheme(next)
-    document.documentElement.dataset.theme = next
-    localStorage.setItem('artel-theme', next)
-  }
-
-  return (
-    <button type="button" className="control" onClick={toggle} aria-pressed={theme === 'dark'}>
-      {theme === 'dark' ? '라이트' : '다크'}
-    </button>
   )
 }

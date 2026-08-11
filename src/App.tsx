@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getSession, type AdminSession } from './auth/sessionApi'
+import { ExpectedLabelsView } from './expectedLabels/ExpectedLabelsView'
 import { KnowledgeStatsDashboard } from './knowledgeStats/KnowledgeStatsDashboard'
 import { QaStatsDashboard } from './qaStats/QaStatsDashboard'
 import './qaStats/dashboard.css'
@@ -16,8 +17,12 @@ type SessionState =
  *   qa        — 에이전트가 테스트를 잘 돌렸나
  *   knowledge — 에이전트가 만든 지식이 쓸모 있나
  * 한 화면에 섞으면 세는 단위가 다른 표(런 vs content 버전)가 나란히 놓여 합이 맞아 보인다.
+ *
+ * `labels`는 대시보드가 아니라 그 둘의 **입력**이다. QA 화면의 미탐·오탐·미보고가 전부 이 라벨과
+ * 대조해 나온 값이라, 라벨을 다는 자리가 그 숫자를 읽는 자리와 같은 도구 안에 있어야 한다 —
+ * 제품 화면에 두면 제품 사용자가 정답지를 건드리고, 라벨 품질이 곧 벤치마크 신뢰도다.
  */
-type View = 'qa' | 'knowledge'
+type View = 'qa' | 'knowledge' | 'labels'
 
 export function App() {
   const [session, setSession] = useState<SessionState>({ kind: 'checking' })
@@ -53,11 +58,9 @@ export function App() {
 
   const nav = <ViewTabs view={view} onChange={setView} />
 
-  return view === 'qa' ? (
-    <QaStatsDashboard onSessionLost={signOut} nav={nav} />
-  ) : (
-    <KnowledgeStatsDashboard onSessionLost={signOut} nav={nav} />
-  )
+  if (view === 'qa') return <QaStatsDashboard onSessionLost={signOut} nav={nav} />
+  if (view === 'knowledge') return <KnowledgeStatsDashboard onSessionLost={signOut} nav={nav} />
+  return <ExpectedLabelsView onSessionLost={signOut} nav={nav} />
 }
 
 /**
@@ -86,6 +89,14 @@ function ViewTabs({ view, onChange }: { view: View; onChange: (next: View) => vo
         onClick={() => onChange('knowledge')}
       >
         지식창고
+      </button>
+      <button
+        type="button"
+        className={view === 'labels' ? 'control control--action' : 'control'}
+        aria-pressed={view === 'labels'}
+        onClick={() => onChange('labels')}
+      >
+        기대 판정 라벨
       </button>
     </span>
   )

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useId, useState, type ReactNode } from 'react'
 import { ApiError, UnauthorizedError } from '../api/orchestration'
 import { listProjects, type ProjectSummary } from '../projects/projectsApi'
 import { formatCount } from '../qaStats/format'
@@ -7,7 +7,8 @@ import { GraphCanvas } from './GraphCanvas'
 import { GraphDetail } from './GraphDetail'
 import { GraphLegend } from './GraphLegend'
 import { RelationList } from './RelationList'
-import { computeGraphLayout } from './layout'
+import type { KnowledgeGraphEdge, KnowledgeGraphNode } from './knowledgeGraphTypes'
+import { useGraphDrag } from './useGraphDrag'
 import { fetchKnowledgeGraph } from './knowledgeGraphApi'
 import type { GraphSelection, KnowledgeGraph } from './knowledgeGraphTypes'
 import '../qaStats/dashboard.css'
@@ -26,6 +27,9 @@ import './graph.css'
 /** 그래프가 읽히는 한계 안에서 고르게 한다. 기본값은 서버 기본값과 같다. */
 const NODE_LIMITS = [100, 200, 500]
 const DEFAULT_NODE_LIMIT = 200
+
+const NO_NODES: KnowledgeGraphNode[] = []
+const NO_EDGES: KnowledgeGraphEdge[] = []
 
 export function KnowledgeGraphDashboard({
   onSessionLost,
@@ -104,10 +108,10 @@ export function KnowledgeGraphDashboard({
    * 노드가 수백 개면 반발력이 O(n²)이라 한 번의 계산도 공짜가 아니다. 선택이 바뀔 때마다 다시
    * 돌면 노드를 누를 때마다 화면이 멎고, 게다가 그래프 모양까지 그대로일 이유가 없어진다.
    */
-  const layout = useMemo(
-    () => (data === null ? null : computeGraphLayout(data.nodes, data.edges)),
-    [data],
-  )
+  // 훅은 조건부로 부를 수 없으니 데이터가 없을 때는 빈 그래프를 넘긴다. 상수라 참조가 안 바뀌고,
+  // 그래서 응답을 기다리는 동안 배치가 매 렌더 다시 계산되지 않는다.
+  const { layout: live, drag } = useGraphDrag(data?.nodes ?? NO_NODES, data?.edges ?? NO_EDGES)
+  const layout = data === null ? null : live
 
   // 세는 것은 응답이 아니라 그려진 것이다. 안내 문구의 수와 그림이 어긋나면 안내가 거짓말이 된다.
   const nodeCount = layout?.nodes.length ?? 0
@@ -235,7 +239,7 @@ export function KnowledgeGraphDashboard({
 
                   <div className="graph-layout">
                     <div className="graph-layout__canvas">
-                      <GraphCanvas layout={layout} selection={selection} onSelect={setSelection} />
+                      <GraphCanvas drag={drag} layout={layout} selection={selection} onSelect={setSelection} />
                       <GraphLegend layout={layout} />
                     </div>
                     <GraphDetail layout={layout} selection={selection} onSelect={setSelection} />

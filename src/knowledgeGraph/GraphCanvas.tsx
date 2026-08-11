@@ -1,4 +1,4 @@
-import { useId, useMemo, type KeyboardEvent } from 'react'
+import { useCallback, useId, useMemo, useRef, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import { edgeGeometry, NODE_RADIUS, type GraphLayout, type RoutedEdge } from './layout'
 import {
   relationStyle,
@@ -11,6 +11,7 @@ import {
 } from './knowledgeGraphTypes'
 import { placeLabels, type LabelPlacement } from './labelPlacement'
 import { truncate } from './text'
+import type { DragHandlers } from './useGraphDrag'
 
 /**
  * 이름표를 전부 붙이는 한계.
@@ -45,13 +46,41 @@ export function GraphCanvas({
   layout,
   selection,
   onSelect,
+  drag,
 }: {
   layout: GraphLayout
   selection: GraphSelection | null
   onSelect: (next: GraphSelection | null) => void
+  drag: DragHandlers
 }) {
   // 한 페이지에 그래프가 둘 이상 올라와도 화살촉 정의가 부딪히지 않게 접두사를 붙인다.
   const markerPrefix = useId().replace(/:/g, '')
+  const svg = useRef<SVGSVGElement>(null)
+
+  /**
+   * 포인터 위치를 그림 자체의 단위로 바꾼다.
+   *
+   * viewBox가 맞춰 늘어나므로 클라이언트 픽셀과 사용자 단위는 같지 않고, 화면 좌표 차이를 그대로
+   * 쓰면 노드가 확대 배율에 따라 커서에서 벗어난다.
+   */
+  const toUserSpace = useCallback((event: { clientX: number; clientY: number }) => {
+    const element = svg.current
+    const matrix = element?.getScreenCTM()
+    if (!element || !matrix) return null
+    const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse())
+    return { x: point.x, y: point.y }
+  }, [])
+
+  const onNodePointerDown = useCallback(
+    (nodeId: string, event: ReactPointerEvent<SVGGElement>) => {
+      const at = toUserSpace(event)
+      if (at === null) return
+      // 포인터 캡처가 있어야 SVG 밖으로 나가도 계속 따라온다. 없으면 가장자리에서 멈춘다.
+      event.currentTarget.setPointerCapture(event.pointerId)
+      drag.onDragStart(nodeId, at.x, at.y)
+    },
+    [drag, toUserSpace],
+  )
   const showLabels = layout.nodes.length <= LABEL_LIMIT
 
   // 라벨은 자르기만으로 부족하다. 자기 예산에 맞는 라벨도 옆 노드 라벨 위에 앉을 수 있어서,
@@ -82,9 +111,19 @@ export function GraphCanvas({
   return (
     <div className="graph__frame">
       <svg
-        className="graph"
+        className={`graph${drag.dragging === null ? '' : ' graph--dragging'}`}
         viewBox={`0 0 ${layout.width} ${layout.height}`}
         preserveAspectRatio="xMidYMid meet"
+        ref={svg}
+        onPointerMove={(event) => {
+          if (drag.dragging === null) return
+          const at = toUserSpace(event)
+          if (at !== null) drag.onDragMove(at.x, at.y)
+        }}
+        // 끝나는 길이 둘이다. up은 보통의 경우이고, cancel은 브라우저가 제스처를 가져간 경우다.
+        // cancel을 안 받으면 노드가 더 이상 오지 않는 포인터에 붙은 채로 남는다.
+        onPointerCancel={drag.onDragEnd}
+        onPointerUp={drag.onDragEnd}
         role="group"
         aria-label={`지식 ${layout.nodes.length}개와 관계 ${layout.edges.length}개의 그래프`}
       >
@@ -127,7 +166,9 @@ export function GraphCanvas({
               node={positioned.node}
               x={positioned.x}
               y={positioned.y}
+              held={drag.dragging === positioned.node.id}
               label={labels.get(positioned.node.id) ?? null}
+              onPointerDown={onNodePointerDown}
               selected={selection?.kind === 'node' && selection.id === positioned.node.id}
               onSelect={onSelect}
             />
@@ -183,14 +224,18 @@ function NodeMark({
   node,
   x,
   y,
+  held,
   label,
+  onPointerDown,
   selected,
   onSelect,
 }: {
   node: KnowledgeGraphNode
   x: number
   y: number
+  held: boolean
   label: LabelPlacement | null
+  onPointerDown: (nodeId: string, event: ReactPointerEvent<SVGGElement>) => void
   selected: boolean
   onSelect: (next: GraphSelection) => void
 }) {
@@ -205,13 +250,18 @@ function NodeMark({
 
   return (
     <g
-      className={`graph__node graph__node--${shape}${selected ? ' graph__node--selected' : ''}`}
+      className={`graph__node graph__node--${shape}${selected ? ' graph__node--selected' : ''}${
+        held ? ' graph__node--held' : ''
+      }`}
       role="button"
       tabIndex={0}
       aria-pressed={selected}
       aria-label={`${summary} · ${sourceLabel(node.source)}`}
+      // 클릭은 그대로 선택이다. 드래그는 포인터 제스처이고 클릭은 그 제스처가 아무 데도 안 갔을 때
+      // 브라우저가 알려 주는 것이라, 우리가 거리 임계값을 두지 않아도 둘이 공존한다.
       onClick={select}
       onKeyDown={onKeyDown}
+      onPointerDown={(event) => onPointerDown(node.id, event)}
     >
       <title>{summary}</title>
       {selected && <circle className="graph__node-halo" cx={x} cy={y} r={NODE_RADIUS + 5} />}

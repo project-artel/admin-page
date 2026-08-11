@@ -400,3 +400,18 @@
   font-weight: 600;
   color: var(--color-action-primary);
 }
+
+/* 노드는 끌 수 있다. SVG 도형에서 드래그를 시작하면 브라우저가 자기 이미지 드래그를 시작해
+   포인터 스트림을 가져가므로, touch-action으로 그것을 막아야 제스처가 끊기지 않는다. */
+.graph__node {
+  cursor: grab;
+  touch-action: none;
+}
+.graph__node--held {
+  cursor: grabbing;
+}
+/* 쥐고 있는 동안에는 포인터가 노드를 벗어나도 커서가 유지돼, 제스처가 하나로 읽힌다. */
+.graph--dragging,
+.graph--dragging .graph__node {
+  cursor: grabbing;
+}

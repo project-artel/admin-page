@@ -1,5 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
+import type { DragHandlers } from './useGraphDrag'
 import { GraphCanvas } from './GraphCanvas'
 import { GraphDetail } from './GraphDetail'
 import { GraphLegend } from './GraphLegend'
@@ -40,10 +41,18 @@ const nodes = [node('1'), node('2', { source: 'DOCS', createdByQaTryId: null })]
 const edges = [edge('1', '2', 'CONTRADICTS', '상점 버튼이 마을이 아니라 광장에 있다')]
 const layout = computeGraphLayout(nodes, edges)
 
+/** 드래그는 이 테스트의 대상이 아니다 — 캔버스가 그리는 것만 본다. */
+const NO_DRAG: DragHandlers = {
+  dragging: null,
+  onDragStart: () => {},
+  onDragMove: () => {},
+  onDragEnd: () => {},
+}
+
 describe('GraphCanvas', () => {
   it('노드와 간선을 그린다', () => {
     const html = renderToStaticMarkup(
-      <GraphCanvas layout={layout} selection={null} onSelect={() => {}} />,
+      <GraphCanvas drag={NO_DRAG} layout={layout} selection={null} onSelect={() => {}} />,
     )
     expect(html).toContain('graph__node')
     expect(html).toContain('graph__edge--contradicts')
@@ -53,7 +62,7 @@ describe('GraphCanvas', () => {
 
   it('노드를 키보드로 고를 수 있다', () => {
     const html = renderToStaticMarkup(
-      <GraphCanvas layout={layout} selection={null} onSelect={() => {}} />,
+      <GraphCanvas drag={NO_DRAG} layout={layout} selection={null} onSelect={() => {}} />,
     )
     expect(html).toContain('tabindex="0"')
     expect(html).toContain('role="button"')
@@ -61,7 +70,7 @@ describe('GraphCanvas', () => {
 
   it('고른 노드를 색이 아니라 aria로도 말한다', () => {
     const html = renderToStaticMarkup(
-      <GraphCanvas layout={layout} selection={{ kind: 'node', id: '1' }} onSelect={() => {}} />,
+      <GraphCanvas drag={NO_DRAG} layout={layout} selection={{ kind: 'node', id: '1' }} onSelect={() => {}} />,
     )
     expect(html).toContain('aria-pressed="true"')
     expect(html).toContain('graph__node--selected')
@@ -70,7 +79,7 @@ describe('GraphCanvas', () => {
   it('간선이 없어도 노드는 그린다', () => {
     const only = computeGraphLayout(nodes, [])
     const html = renderToStaticMarkup(
-      <GraphCanvas layout={only} selection={null} onSelect={() => {}} />,
+      <GraphCanvas drag={NO_DRAG} layout={only} selection={null} onSelect={() => {}} />,
     )
     expect(html).toContain('graph__node')
     expect(html).not.toContain('graph__edge-line')
@@ -79,7 +88,7 @@ describe('GraphCanvas', () => {
   it('빈 그래프에도 무너지지 않는다', () => {
     const empty = computeGraphLayout([], [])
     const html = renderToStaticMarkup(
-      <GraphCanvas layout={empty} selection={null} onSelect={() => {}} />,
+      <GraphCanvas drag={NO_DRAG} layout={empty} selection={null} onSelect={() => {}} />,
     )
     expect(html).toContain('<svg')
   })
@@ -87,7 +96,7 @@ describe('GraphCanvas', () => {
   it('자기 참조 간선도 그린다', () => {
     const self = computeGraphLayout([node('1')], [edge('1', '1', 'REFINES')])
     const html = renderToStaticMarkup(
-      <GraphCanvas layout={self} selection={null} onSelect={() => {}} />,
+      <GraphCanvas drag={NO_DRAG} layout={self} selection={null} onSelect={() => {}} />,
     )
     expect(html).toContain('graph__edge--refines')
     expect(html).not.toContain('NaN')
@@ -96,7 +105,7 @@ describe('GraphCanvas', () => {
   it('모르는 relation을 기타 모양으로 그린다', () => {
     const unknown = computeGraphLayout(nodes, [edge('1', '2', 'BRAND_NEW_RELATION')])
     const html = renderToStaticMarkup(
-      <GraphCanvas layout={unknown} selection={null} onSelect={() => {}} />,
+      <GraphCanvas drag={NO_DRAG} layout={unknown} selection={null} onSelect={() => {}} />,
     )
     expect(html).toContain('graph__edge--other')
   })

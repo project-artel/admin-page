@@ -48,7 +48,7 @@ the PR rather than leaving them for review time.
 | `infra` | `infra` |
 
 ```bash
-gh pr create --assignee @me --label enhancement ...
+gh pr create --draft --assignee @me --label enhancement ...
 ```
 
 Create the label in the repository when it does not exist yet. Do not
@@ -80,7 +80,7 @@ This prevents shell quoting, command substitution, and newline damage.
 Use a temporary file unless the repository requires the PR draft to be tracked:
 
 ```bash
-gh pr create --title "<title>" --body-file /tmp/pr-body.md
+gh pr create --draft --title "<title>" --body-file /tmp/pr-body.md
 ```
 
 After creation, read the remote PR back with `gh pr view` and confirm the title
@@ -91,7 +91,12 @@ successful verification.
 ## Review Rules
 
 - Keep PR focused on one coherent outcome.
-- Mark draft while known required work remains.
+- Always create the PR as a draft, even when implementation and validation are
+  complete. With GitHub CLI, pass `--draft` to `gh pr create`.
+- Agents must never mark a PR ready for review. A human must review the draft
+  and manually mark it ready.
+- After creating the draft PR, tell the user that human review and manual
+  ready-for-review transition are required.
 - Respond to each actionable review comment.
 - Resolve threads only after change or explicit agreement.
 - Add new commits during review when history clarity matters.

@@ -32,7 +32,9 @@ is installed.
 7. Follow `testing.md`; use an installed testing skill when available.
 8. Review the complete diff for scope, correctness, and accidental churn.
 9. Commit coherent units using the commit convention.
-10. Open a PR with evidence and explicit remaining risk, as soon as the work is ready and without waiting to be asked. Set its assignee and type label per `pull-request.md`.
+10. Open a draft PR with evidence and explicit remaining risk, as soon as the
+    work is ready and without waiting to be asked. Follow `pull-request.md` for
+    draft ownership, user notification, assignee, and type-label rules.
 11. Address review without hiding unresolved concerns.
 
 ## Jira-Driven Development Flow
@@ -95,7 +97,7 @@ issues. Jira access is described in `project.md`.
 6. **Pair review.** Use the `pair-review` skill when installed. Resolve or
    explicitly accept every finding before opening the PR.
 
-7. **Open the PR.** Do this as soon as the work is ready, without waiting to be
+7. **Open the draft PR.** Do this as soon as the work is ready, without waiting to be
    asked. Follow `pull-request.md`, targeting `main`. Set the assignee and the
    type label, and end the body with a `Jira: <ISSUE KEY>` trailer so the issue
    links back.

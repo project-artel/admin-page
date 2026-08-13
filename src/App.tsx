@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getSession, type AdminSession } from './auth/sessionApi'
+import { ExpectedLabelsView } from './expectedLabels/ExpectedLabelsView'
 import { KnowledgeGraphDashboard } from './knowledgeGraph/KnowledgeGraphDashboard'
 import { KnowledgeStatsDashboard } from './knowledgeStats/KnowledgeStatsDashboard'
 import { QaStatsDashboard } from './qaStats/QaStatsDashboard'
@@ -18,12 +19,16 @@ type SessionState =
  *   knowledge — 에이전트가 만든 지식이 쓸모 있나
  * 한 화면에 섞으면 세는 단위가 다른 표(런 vs content 버전)가 나란히 놓여 합이 맞아 보인다.
  *
- * 세 번째는 축이 아예 없다.
+ * `graph`는 축이 아예 없다.
  *   graph     — 지식들이 서로 어떤 관계로 얽혀 있나
  * 집계가 아니라 지도라, 앞의 둘과 나란히 두면 같은 축으로 접히는 표처럼 읽힌다. 그래서 탭을
  * 나눈다.
+ *
+ * `labels`는 대시보드가 아니라 그 셋의 **입력**이다. QA 화면의 미탐·오탐·미보고가 전부 이 라벨과
+ * 대조해 나온 값이라, 라벨을 다는 자리가 그 숫자를 읽는 자리와 같은 도구 안에 있어야 한다 —
+ * 제품 화면에 두면 제품 사용자가 정답지를 건드리고, 라벨 품질이 곧 벤치마크 신뢰도다.
  */
-type View = 'qa' | 'knowledge' | 'graph'
+type View = 'qa' | 'knowledge' | 'graph' | 'labels'
 
 export function App() {
   const [session, setSession] = useState<SessionState>({ kind: 'checking' })
@@ -61,13 +66,15 @@ export function App() {
 
   if (view === 'qa') return <QaStatsDashboard onSessionLost={signOut} nav={nav} />
   if (view === 'knowledge') return <KnowledgeStatsDashboard onSessionLost={signOut} nav={nav} />
-  return <KnowledgeGraphDashboard onSessionLost={signOut} nav={nav} />
+  if (view === 'graph') return <KnowledgeGraphDashboard onSessionLost={signOut} nav={nav} />
+  return <ExpectedLabelsView onSessionLost={signOut} nav={nav} />
 }
 
 const TABS: Array<{ view: View; label: string }> = [
   { view: 'qa', label: 'QA 실행' },
   { view: 'knowledge', label: '지식창고' },
   { view: 'graph', label: '지식 그래프' },
+  { view: 'labels', label: '기대 판정 라벨' },
 ]
 
 /**

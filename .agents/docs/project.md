@@ -18,8 +18,8 @@ Fill this document during project initialization. Agents must verify commands ag
 - External systems: artel-orchestration-server REST API (`VITE_ORCHESTRATION_URL`), artel-home for
   the OAuth login flow (`VITE_HOME_URL`), GitHub repository `project-artel/admin-page`, and Jira
   project `ARTEL` via the `mcp-atlassian` MCP server
-- Persistent data: none. Session lives in orchestration cookies; the theme is in `localStorage`
-  under `artel-theme`, shared with artel-home
+- Persistent data: none. Session lives in orchestration cookies; the theme is in the `artel-theme`
+  cookie scoped to `.artel.kr`, shared with artel-home
 
 ## Commands
 

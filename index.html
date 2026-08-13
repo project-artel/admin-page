@@ -16,19 +16,34 @@
       href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
     />
     <script>
-      // artel-home과 같은 저장 키를 쓴다. 두 사이트를 오가는 사람은 같은 종이 위에 있고,
-      // 경계에서 테마가 뒤집히면 그렇지 않다고 말하는 셈이다. 첫 페인트부터 맞도록 인라인이다.
+      // artel-home과 같은 이름·같은 속성의 쿠키를 쓴다. 두 사이트를 오가는 사람은 같은 종이
+      // 위에 있고, 경계에서 테마가 뒤집히면 그렇지 않다고 말하는 셈이다. localStorage는
+      // origin마다 따로라 그 경계를 넘지 못한다. 첫 페인트부터 맞도록 인라인이고, 모듈
+      // import는 defer되므로 src/theme.ts와의 중복을 감수한다.
       ;(() => {
-        const saved = localStorage.getItem('artel-theme')
+        const cookieMatch = document.cookie.match(/(?:^|;\s*)artel-theme=(light|dark)(?:;|$)/)
+        const legacy = cookieMatch ? null : localStorage.getItem('artel-theme')
         const theme =
-          saved === 'light' || saved === 'dark'
-            ? saved
+          cookieMatch?.[1] ??
+          (legacy === 'light' || legacy === 'dark'
+            ? legacy
             : matchMedia('(prefers-color-scheme: dark)').matches
               ? 'dark'
-              : 'light'
+              : 'light')
         document.documentElement.dataset.theme = theme
         document.querySelector('meta[name="theme-color"]').content =
           theme === 'dark' ? '#14161c' : '#F7F4EE'
+
+        // 매 로드마다 다시 쓴다. 예전 localStorage 값이 이때 쿠키로 넘어오고, 자주 오는
+        // 사용자는 만료가 계속 미뤄진다.
+        const shared = location.hostname === 'artel.kr' || location.hostname.endsWith('.artel.kr')
+        document.cookie =
+          'artel-theme=' +
+          theme +
+          '; Path=/; Max-Age=31536000; SameSite=Lax' +
+          (shared ? '; Domain=.artel.kr' : '') +
+          (location.protocol === 'https:' ? '; Secure' : '')
+        if (legacy) localStorage.removeItem('artel-theme')
       })()
     </script>
     <title>ARTEL Admin</title>

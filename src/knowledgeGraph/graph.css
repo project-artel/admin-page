@@ -1,0 +1,417 @@
+/* 지식 그래프.
+   `qaStats/dashboard.css`와 같은 규칙 위에 있다 — 그림자 없이 1px 선과 배경 단계로만 깊이를
+   만들고(DESIGN.md), 클래스 이름도 같은 `블록__요소--변형` 꼴을 쓴다. 파일만 나눈 이유는
+   여기 있는 것이 전부 SVG 전용이라 표 화면과 섞이지 않아서다.
+
+   ── 색을 쓰는 규칙 ────────────────────────────────────────────────────
+   관계 종류를 색으로 가르지 않는다. 종류는 늘어나기로 되어 있는데 서로 구분되면서 페이퍼 위에서
+   대비를 지키는 색은 그만큼 늘어나지 않고, 늘리는 순간 색각 이상에서 먼저 무너진다. 그래서
+   종류는 **선 모양**이 지고 색은 전부 같은 잉크다.
+
+   예외는 `CONTRADICTS` 하나다. 성격이 반대인 유일한 관계이고, DESIGN.md의 "조용하다가 결정적일
+   때만 강한 색"이 정확히 이 자리를 위한 규칙이다. 그마저도 색 혼자가 아니라 굵기와 ✕ 표식을
+   함께 진다. */
+
+.graph-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+
+/* 인스펙터는 DESIGN.md의 기본 폭 320px. 좁아지면 그림 아래로 내려간다. */
+@media (min-width: 1024px) {
+  .graph-layout {
+    grid-template-columns: minmax(0, 1fr) 320px;
+  }
+}
+
+.graph-layout__canvas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.graph__frame {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+  overflow: hidden;
+}
+
+/* viewBox가 비율을 쥐고 있어 높이를 지정하지 않는다. 넓어지면 그림도 함께 커진다. */
+.graph {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* ── 간선 ─────────────────────────────────────────────────────────── */
+
+/* 집을 수 있는 것은 그림 안의 간선뿐이다. 범례가 같은 클래스로 같은 선 모양을 다시 그리기
+   때문에, 손이 닿는 규칙만 `.graph` 아래로 좁힌다. */
+.graph .graph__edge {
+  cursor: pointer;
+}
+
+.graph__edge-line {
+  fill: none;
+  stroke: var(--color-text-secondary);
+  stroke-width: 1.4;
+}
+
+/* 1.4px 선은 마우스로 집히지 않는다. 보이지 않는 굵은 선이 집는 일을 맡는다. */
+.graph__edge-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 12;
+}
+
+.graph__arrow {
+  fill: var(--color-text-secondary);
+}
+
+.graph__edge--leads-to .graph__edge-line {
+  stroke-dasharray: none;
+}
+
+.graph__edge--refines .graph__edge-line {
+  stroke-dasharray: 9 4;
+}
+
+.graph__edge--depends-on .graph__edge-line {
+  stroke-dasharray: 2 4;
+}
+
+.graph__edge--replaces .graph__edge-line {
+  stroke-dasharray: 12 4 3 4;
+}
+
+/* 모르는 relation. 지어낸 이름 대신 서버가 준 문자열이 범례에 그대로 실리고, 선은 아는 어느
+   종류와도 겹치지 않는 모양을 받는다. */
+.graph__edge--other .graph__edge-line {
+  stroke: var(--color-text-muted);
+  stroke-dasharray: 6 3 1 3 1 3;
+}
+
+.graph__arrow--other {
+  fill: var(--color-text-muted);
+}
+
+/* 모순. 색·굵기·표식 셋이 같은 말을 한다. 셋 중 어느 하나만 남아도 이 선은 눈에 띈다. */
+.graph__edge--contradicts .graph__edge-line {
+  stroke: var(--color-status-critical-strong);
+  stroke-width: 2.4;
+  stroke-dasharray: 1 4;
+  stroke-linecap: round;
+}
+
+.graph__arrow--contradicts {
+  fill: var(--color-status-critical-strong);
+}
+
+.graph__edge-mark {
+  fill: var(--color-status-critical-strong);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  text-anchor: middle;
+  dominant-baseline: middle;
+  paint-order: stroke;
+  /* 선 위에 글자가 겹쳐 읽히지 않게 종이색으로 테를 두른다. */
+  stroke: var(--color-bg-surface);
+  stroke-width: 3;
+}
+
+.graph__edge--selected .graph__edge-line {
+  stroke: var(--color-action-primary);
+  stroke-width: 3;
+}
+
+.graph .graph__edge:hover .graph__edge-line {
+  stroke-width: 3;
+}
+
+/* ── 노드 ─────────────────────────────────────────────────────────── */
+
+.graph .graph__node {
+  cursor: pointer;
+}
+
+.graph__node-body {
+  fill: var(--color-bg-raised);
+  stroke: var(--color-border-strong);
+  stroke-width: 1.4;
+}
+
+.graph .graph__node:hover .graph__node-body {
+  fill: var(--color-bg-hover);
+}
+
+.graph__node--selected .graph__node-body {
+  stroke: var(--color-action-primary);
+  stroke-width: 2.4;
+}
+
+/* 고른 노드의 테두리. 색만으로 말하지 않으려고 고리를 하나 더 두른다. */
+.graph__node-halo {
+  fill: none;
+  stroke: var(--color-action-primary);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.graph__node:focus-visible {
+  outline: 2px solid var(--color-action-primary);
+  outline-offset: 3px;
+}
+
+.graph__node-label {
+  fill: var(--color-text-muted);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  paint-order: stroke;
+  stroke: var(--color-bg-surface);
+  stroke-width: 3;
+}
+
+.graph__node--selected .graph__node-label {
+  fill: var(--color-text-primary);
+  font-weight: 600;
+}
+
+/* ── 범례 ─────────────────────────────────────────────────────────── */
+
+.legend {
+  display: grid;
+  gap: var(--space-5);
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 720px) {
+  .legend {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.legend__title {
+  margin: 0 0 var(--space-2);
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.legend__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.legend__item {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.legend__sample {
+  width: 48px;
+  height: 12px;
+  overflow: visible;
+  cursor: default;
+}
+
+.legend__label {
+  color: var(--color-text-primary);
+}
+
+/* 선 모양을 글자로 옮긴 것. 색과 모양이 둘 다 사라진 경로에는 이 글자만 남는다. */
+.legend__hint {
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.legend__count {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-secondary);
+}
+
+.legend__empty {
+  margin: 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--color-text-muted);
+}
+
+/* 출처 범례의 도형은 작은 정사각 칸에 그린다. */
+.legend__sample.graph__node {
+  width: 16px;
+  height: 16px;
+}
+
+/* ── 상세 패널 ─────────────────────────────────────────────────────── */
+
+.detail {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+  padding: var(--space-4);
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--color-text-secondary);
+}
+
+.detail__title {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-display);
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.detail__subtitle {
+  margin: var(--space-4) 0 var(--space-2);
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  border-top: 1px solid var(--color-border-subtle);
+  padding-top: var(--space-3);
+}
+
+.detail__hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--color-text-muted);
+}
+
+.detail__fields {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+}
+
+.detail__fields dt {
+  font-size: 11px;
+  line-height: 20px;
+  color: var(--color-text-muted);
+}
+
+.detail__fields dd {
+  margin: 0;
+  color: var(--color-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.detail__links {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.detail__link {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 32px;
+  padding: var(--space-1) var(--space-2);
+  text-align: left;
+  color: var(--color-text-primary);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  line-height: 18px;
+  cursor: pointer;
+}
+
+.detail__link:hover {
+  background: var(--color-bg-hover);
+  border-color: var(--color-border-subtle);
+}
+
+.detail__direction {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.detail__peer {
+  color: var(--color-text-secondary);
+}
+
+/* 메모. 이 화면에서 유일하게 사람이 쓴 문장이 놓이는 자리다. */
+.detail__note {
+  margin: 0;
+  color: var(--color-text-primary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* ── 관계 목록 ─────────────────────────────────────────────────────── */
+
+/* 간선이 수백 개면 표가 화면을 통째로 밀어낸다. 높이를 묶고 안에서 스크롤한다. */
+.table-scroll--tall {
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.table tbody tr.is-selected {
+  background: var(--color-bg-hover);
+}
+
+.relation__note {
+  white-space: normal;
+  max-width: 44ch;
+  color: var(--color-text-secondary);
+}
+
+.link-button {
+  padding: 0;
+  min-height: 24px;
+  color: var(--color-text-primary);
+  background: none;
+  border: 0;
+  font-size: 13px;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.link-button[aria-pressed='true'] {
+  font-weight: 600;
+  color: var(--color-action-primary);
+}
+
+/* 노드는 끌 수 있다. SVG 도형에서 드래그를 시작하면 브라우저가 자기 이미지 드래그를 시작해
+   포인터 스트림을 가져가므로, touch-action으로 그것을 막아야 제스처가 끊기지 않는다. */
+.graph__node {
+  cursor: grab;
+  touch-action: none;
+}
+.graph__node--held {
+  cursor: grabbing;
+}
+/* 쥐고 있는 동안에는 포인터가 노드를 벗어나도 커서가 유지돼, 제스처가 하나로 읽힌다. */
+.graph--dragging,
+.graph--dragging .graph__node {
+  cursor: grabbing;
+}

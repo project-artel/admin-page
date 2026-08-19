@@ -61,6 +61,8 @@ substitute a label that carries a different meaning.
 
 ## What Changed
 
+## Example
+
 ## Validation
 - [ ] Command or manual check
 
@@ -70,6 +72,36 @@ substitute a label that carries a different meaning.
 
 Jira: ARTEL-123 (omit when no Jira work item exists)
 ```
+
+## Example
+
+A pull request that changes how data moves, or what a screen shows, carries an
+`Example` section. Required for those two kinds of change; omit it for a
+documentation, refactor, or configuration change that touches neither.
+
+The point is that a reviewer can see the change happen without running it. A
+diff shows what the code became; it does not show what the system now does with
+a record.
+
+**Data flow.** Follow one concrete record end to end: the input as it arrives
+(wire payload, file, message), what gets written and where — name the tables,
+columns, keys, or object paths — and what the next consumer reads back. Prefer
+real values taken from a fixture, a test, or a local run over invented ones, and
+say which they are. "It is persisted" is not an example; the row is.
+
+**Screens.** Embed a screenshot for every state the change introduces, not just
+the successful one. Capture against a running stack whenever the screen can
+reach one — a screenshot of mock data proves the component renders, not that the
+contract holds. Commit the images into the repository, under
+`.plan/assets/<plan-name>/` where the repository keeps plans, and link them with
+a `raw.githubusercontent.com` address pinned to the commit hash. A
+repository-relative path does not render inside a pull request body, and an
+image hosted elsewhere goes blank when that host does.
+
+**Say what the example does not prove.** An example built from seeded rows, a
+fixture, or a stubbed dependency demonstrates the shape, not the integration.
+State that in the section itself. A reviewer who assumes end-to-end evidence
+because none was disclaimed is a reviewer the pull request misled.
 
 ## Safe Creation
 

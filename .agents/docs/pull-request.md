@@ -15,11 +15,11 @@ PR should let reviewer understand intent, verify evidence, and identify risk wit
 
 ## Language
 
-Write the pull request title and body in Korean. Reviewers read Korean; the
-commit history stays in English.
+Write the pull request title and body in Korean. Keep the Conventional Commit
+type and optional scope in English.
 
-Keep verbatim in English regardless: the Conventional Commit type prefix, code
-identifiers, file paths, commands, log output, error strings, and section
+Keep verbatim in English regardless: code identifiers, file paths, commands,
+log output, error strings, API names, technical terminology, and the section
 headings from the body template below.
 
 ## Title

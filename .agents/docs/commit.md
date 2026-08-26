@@ -6,18 +6,24 @@ Each commit should explain one coherent change and remain safe to review or reve
 
 ## Format
 
+Write the commit title and body in Korean. Keep the Conventional Commit type
+and optional scope in English.
+
+Keep verbatim in English regardless: code identifiers, file paths, commands,
+log output, error strings, API names, and technical terminology.
+
 Use Conventional Commits:
 
 ```text
-<type>(<optional-scope>): <imperative summary>
+<type>(<optional-scope>): <한글 변경 사항>
 ```
 
 Examples:
 
 ```text
-feat(auth): add session timeout
-fix(api): handle empty upstream response
-docs: document local test setup
+feat(auth): 세션 만료 기능 추가
+fix(api): 빈 upstream 응답 처리
+docs: 로컬 테스트 방법 문서화
 ```
 
 Use the same types defined in [`branch.md`](branch.md).

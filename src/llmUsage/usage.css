@@ -52,17 +52,21 @@
   height: 100%;
 }
 
+/* 중립 회색이다. `--color-action-primary`는 이 테마에서 #f04b3a라 critical(#ff634f)과 사실상
+   같은 색이고, 그것으로 그리면 평범한 지출 추이가 실패한 무엇으로 읽힌다. DESIGN.md의
+   "Calm until critical"이 막는 것이 이것이다 — 뜻은 옆의 숫자가 진다. */
 .trend__fill {
   display: block;
   width: 100%;
   min-height: 1px;
-  background: var(--color-action-primary);
+  background: var(--color-text-secondary);
   border-radius: 1px;
 }
 
-/* 호출이 없던 날. 바닥선 1px을 남겨 "그 날이 표에 없다"와 구분한다. */
+/* 호출이 없던 날. 바닥선 1px을 남겨 "그 날이 표에 없다"와 구분한다. 값이 있는 날보다 연해야
+   한눈에 갈린다. */
 .trend__fill--empty {
-  background: var(--color-border-strong);
+  background: var(--color-border-subtle);
 }
 
 .trend__day:hover .trend__fill {

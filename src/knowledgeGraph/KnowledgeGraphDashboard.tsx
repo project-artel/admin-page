@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useState, type ReactNode } from 'react'
 import { ApiError, UnauthorizedError } from '../api/orchestration'
 import { listProjects, type ProjectSummary } from '../projects/projectsApi'
+import { ProjectPicker } from '../projects/ProjectPicker'
 import { formatCount } from '../qaStats/format'
 import { ThemeToggle } from '../qaStats/QaStatsDashboard'
 import { GraphCanvas } from './GraphCanvas'
@@ -34,8 +35,11 @@ const NO_EDGES: KnowledgeGraphEdge[] = []
 export function KnowledgeGraphDashboard({
   onSessionLost,
   nav,
+  seesAllProjects,
 }: {
   onSessionLost: () => void
+  /** `DEVELOPER` 등급인지. 선택기가 전 프로젝트를 부를지 고르는 데만 쓴다. */
+  seesAllProjects: boolean
   nav?: ReactNode
 }) {
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null)
@@ -47,7 +51,6 @@ export function KnowledgeGraphDashboard({
   const [loading, setLoading] = useState(false)
   const [reloadToken, setReloadToken] = useState(0)
 
-  const projectFieldId = useId()
   const limitFieldId = useId()
 
   const fail = useCallback(
@@ -63,7 +66,7 @@ export function KnowledgeGraphDashboard({
 
   useEffect(() => {
     const controller = new AbortController()
-    listProjects(controller.signal)
+    listProjects(seesAllProjects, controller.signal)
       .then((items) => {
         setProjects(items)
         setProjectId((current) => current ?? items[0]?.id ?? null)
@@ -74,7 +77,7 @@ export function KnowledgeGraphDashboard({
         fail(cause)
       })
     return () => controller.abort()
-  }, [fail])
+  }, [fail, seesAllProjects])
 
   useEffect(() => {
     if (projectId === null) return
@@ -123,26 +126,7 @@ export function KnowledgeGraphDashboard({
         <h1 className="topbar__brand">ARTEL Admin · 지식창고 그래프</h1>
         {nav}
 
-        <span className="field">
-          <label className="field__label" htmlFor={projectFieldId}>
-            프로젝트
-          </label>
-          <select
-            className="control"
-            id={projectFieldId}
-            value={projectId ?? ''}
-            disabled={projects === null || projects.length === 0}
-            onChange={(event) => setProjectId(event.target.value)}
-          >
-            {projects === null && <option value="">불러오는 중…</option>}
-            {projects?.length === 0 && <option value="">참여 중인 프로젝트 없음</option>}
-            {projects?.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.name}
-              </option>
-            ))}
-          </select>
-        </span>
+        <ProjectPicker projects={projects} value={projectId} onChange={(next) => setProjectId(next)} />
 
         <span className="field">
           <label className="field__label" htmlFor={limitFieldId}>

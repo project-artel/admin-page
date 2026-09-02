@@ -71,12 +71,16 @@ export function App() {
   }
 
   const nav = <ViewTabs view={view} onChange={setView} />
+  // 화면이 이 값으로 판단하는 것은 무엇을 요청할지 하나뿐이다. 인가는 서버가 한다.
+  const all = session.user.platformRole === 'DEVELOPER'
 
-  if (view === 'qa') return <QaStatsDashboard onSessionLost={signOut} nav={nav} />
-  if (view === 'usage') return <LlmUsageDashboard onSessionLost={signOut} nav={nav} />
-  if (view === 'knowledge') return <KnowledgeStatsDashboard onSessionLost={signOut} nav={nav} />
-  if (view === 'graph') return <KnowledgeGraphDashboard onSessionLost={signOut} nav={nav} />
-  return <ExpectedLabelsView onSessionLost={signOut} nav={nav} />
+  if (view === 'qa') return <QaStatsDashboard onSessionLost={signOut} nav={nav} seesAllProjects={all} />
+  if (view === 'usage') return <LlmUsageDashboard onSessionLost={signOut} nav={nav} seesAllProjects={all} />
+  if (view === 'knowledge')
+    return <KnowledgeStatsDashboard onSessionLost={signOut} nav={nav} seesAllProjects={all} />
+  if (view === 'graph')
+    return <KnowledgeGraphDashboard onSessionLost={signOut} nav={nav} seesAllProjects={all} />
+  return <ExpectedLabelsView onSessionLost={signOut} nav={nav} seesAllProjects={all} />
 }
 
 const TABS: Array<{ view: View; label: string }> = [

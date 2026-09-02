@@ -3,6 +3,7 @@ import { getSession, type AdminSession } from './auth/sessionApi'
 import { ExpectedLabelsView } from './expectedLabels/ExpectedLabelsView'
 import { KnowledgeGraphDashboard } from './knowledgeGraph/KnowledgeGraphDashboard'
 import { KnowledgeStatsDashboard } from './knowledgeStats/KnowledgeStatsDashboard'
+import { LlmUsageDashboard } from './llmUsage/LlmUsageDashboard'
 import { QaStatsDashboard } from './qaStats/QaStatsDashboard'
 import './qaStats/dashboard.css'
 
@@ -27,8 +28,15 @@ type SessionState =
  * `labels`는 대시보드가 아니라 그 셋의 **입력**이다. QA 화면의 미탐·오탐·미보고가 전부 이 라벨과
  * 대조해 나온 값이라, 라벨을 다는 자리가 그 숫자를 읽는 자리와 같은 도구 안에 있어야 한다 —
  * 제품 화면에 두면 제품 사용자가 정답지를 건드리고, 라벨 품질이 곧 벤치마크 신뢰도다.
+ *
+ * `usage`는 세는 단위가 앞의 셋과 또 다르다.
+ *   usage     — 그걸 돌리는 데 돈이 얼마 들었나
+ * `qa`도 토큰과 비용을 보여주지만 그것은 런을 실행 설정 4-튜플로 **분할**해 센 것이고, 이쪽은
+ * LLM 호출 하나하나를 기능·모델·프로젝트·일자로 각각 접는다. 게다가 QA 화면은 QA 실행 지출만
+ * 덮는다 — 시나리오 작성과 임베딩은 저기 안 나온다. 한 화면에 섞으면 합이 맞아 보이는 두 표가
+ * 나란히 놓인다.
  */
-type View = 'qa' | 'knowledge' | 'graph' | 'labels'
+type View = 'qa' | 'knowledge' | 'graph' | 'labels' | 'usage'
 
 export function App() {
   const [session, setSession] = useState<SessionState>({ kind: 'checking' })
@@ -65,6 +73,7 @@ export function App() {
   const nav = <ViewTabs view={view} onChange={setView} />
 
   if (view === 'qa') return <QaStatsDashboard onSessionLost={signOut} nav={nav} />
+  if (view === 'usage') return <LlmUsageDashboard onSessionLost={signOut} nav={nav} />
   if (view === 'knowledge') return <KnowledgeStatsDashboard onSessionLost={signOut} nav={nav} />
   if (view === 'graph') return <KnowledgeGraphDashboard onSessionLost={signOut} nav={nav} />
   return <ExpectedLabelsView onSessionLost={signOut} nav={nav} />
@@ -72,6 +81,7 @@ export function App() {
 
 const TABS: Array<{ view: View; label: string }> = [
   { view: 'qa', label: 'QA 실행' },
+  { view: 'usage', label: '토큰 사용량' },
   { view: 'knowledge', label: '지식창고' },
   { view: 'graph', label: '지식 그래프' },
   { view: 'labels', label: '기대 판정 라벨' },

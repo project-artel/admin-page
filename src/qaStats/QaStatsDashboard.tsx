@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from 'react'
 import { ApiError, UnauthorizedError } from '../api/orchestration'
 import { listProjects, type ProjectSummary } from '../projects/projectsApi'
+import { ALL_PROJECTS } from '../projects/pick'
 import { ProjectPicker } from '../projects/ProjectPicker'
 import { applyTheme, type Theme } from '../theme'
 import { AxisBreakdown } from './AxisBreakdown'
@@ -86,14 +87,17 @@ export function QaStatsDashboard({
 
   useEffect(() => {
     if (projectId === null) return
+    const one = projectId === ALL_PROJECTS ? null : projectId
 
     const controller = new AbortController()
     setLoading(true)
     setError(null)
 
     Promise.all([
-      fetchQaStats({ projectId, from, to }, controller.signal),
-      fetchRecentQaTries(projectId, RECENT_RUN_COUNT, controller.signal),
+      fetchQaStats({ projectId: one, from, to }, controller.signal),
+      // `GET /api/qa-tries`는 프로젝트를 요구한다. 목록이라 합산할 대상이 아니어서
+      // ARTEL-750 이 넓히지 않았고, 그래서 전체를 고르면 최근 런 자리가 빈다.
+      one === null ? Promise.resolve([]) : fetchRecentQaTries(one, RECENT_RUN_COUNT, controller.signal),
     ])
       .then(([stats, runs]) => {
         setData({ stats, runs })
@@ -121,6 +125,8 @@ export function QaStatsDashboard({
           projects={projects}
           value={projectId}
           onChange={(next) => setProjectId(next)}
+          allowAll
+          allLabel={seesAllProjects ? '전체 프로젝트' : '참여 중인 전체'}
         />
 
         <span className="field">
@@ -216,7 +222,14 @@ export function QaStatsDashboard({
 
             <ScoreBreakdown cells={cells} />
             <CombinationMatrix cells={cells} />
-            <RecentRuns runs={data.runs} />
+            {projectId === ALL_PROJECTS ? (
+              <p className="muted">
+                최근 런은 프로젝트를 하나 골라야 나옵니다. 이 목록은 합산하는 집계가 아니라 런
+                하나하나라, 전체를 고르면 어느 프로젝트의 런인지 줄마다 달라 표가 읽히지 않습니다.
+              </p>
+            ) : (
+              <RecentRuns runs={data.runs} />
+            )}
           </>
         )}
 

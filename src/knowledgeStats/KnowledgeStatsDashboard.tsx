@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from 'react'
 import { ApiError, UnauthorizedError } from '../api/orchestration'
 import { listProjects, type ProjectSummary } from '../projects/projectsApi'
+import { ALL_PROJECTS } from '../projects/pick'
 import { ProjectPicker } from '../projects/ProjectPicker'
 import { toDateInputValue } from '../qaStats/format'
 import { ThemeToggle } from '../qaStats/QaStatsDashboard'
@@ -86,7 +87,10 @@ export function KnowledgeStatsDashboard({
     setLoading(true)
     setError(null)
 
-    fetchKnowledgeStats({ projectId, from, to }, controller.signal)
+    fetchKnowledgeStats(
+      { projectId: projectId === ALL_PROJECTS ? null : projectId, from, to },
+      controller.signal
+    )
       .then((stats) => {
         setData(stats)
         setLoading(false)
@@ -109,7 +113,13 @@ export function KnowledgeStatsDashboard({
         <h1 className="topbar__brand">ARTEL Admin · 지식창고</h1>
         {nav}
 
-        <ProjectPicker projects={projects} value={projectId} onChange={(next) => setProjectId(next)} />
+        <ProjectPicker
+          projects={projects}
+          value={projectId}
+          onChange={(next) => setProjectId(next)}
+          allowAll
+          allLabel={seesAllProjects ? '전체 프로젝트' : '참여 중인 전체'}
+        />
 
         <span className="field">
           <label className="field__label" htmlFor={fromFieldId}>

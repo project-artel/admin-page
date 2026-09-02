@@ -83,7 +83,8 @@ export type QaStatsTotals = Omit<
 >
 
 export interface QaStats {
-  projectId: string
+  /** 물어본 프로젝트. 전체 합산으로 부르면 null 이다. */
+  projectId: string | null
   from: string
   to: string
   total: QaStatsTotals

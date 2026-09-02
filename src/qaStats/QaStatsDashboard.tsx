@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from 'react'
 import { ApiError, UnauthorizedError } from '../api/orchestration'
 import { listProjects, type ProjectSummary } from '../projects/projectsApi'
+import { ALL_PROJECTS } from '../projects/pick'
+import { ProjectPicker } from '../projects/ProjectPicker'
 import { applyTheme, type Theme } from '../theme'
 import { AxisBreakdown } from './AxisBreakdown'
 import { CombinationMatrix } from './CombinationMatrix'
@@ -36,8 +38,11 @@ interface Loaded {
 export function QaStatsDashboard({
   onSessionLost,
   nav,
+  seesAllProjects,
 }: {
   onSessionLost: () => void
+  /** `DEVELOPER` 등급인지. 선택기가 전 프로젝트를 부를지 고르는 데만 쓴다. */
+  seesAllProjects: boolean
   /** 화면 전환 탭. 대시보드가 자기 topbar를 가지고 있어 여기로 받아 끼운다. */
   nav?: ReactNode
 }) {
@@ -51,7 +56,6 @@ export function QaStatsDashboard({
   const [loading, setLoading] = useState(false)
   const [reloadToken, setReloadToken] = useState(0)
 
-  const projectFieldId = useId()
   const fromFieldId = useId()
   const toFieldId = useId()
 
@@ -68,7 +72,7 @@ export function QaStatsDashboard({
 
   useEffect(() => {
     const controller = new AbortController()
-    listProjects(controller.signal)
+    listProjects(seesAllProjects, controller.signal)
       .then((items) => {
         setProjects(items)
         setProjectId((current) => current ?? items[0]?.id ?? null)
@@ -79,18 +83,21 @@ export function QaStatsDashboard({
         fail(cause)
       })
     return () => controller.abort()
-  }, [fail])
+  }, [fail, seesAllProjects])
 
   useEffect(() => {
     if (projectId === null) return
+    const one = projectId === ALL_PROJECTS ? null : projectId
 
     const controller = new AbortController()
     setLoading(true)
     setError(null)
 
     Promise.all([
-      fetchQaStats({ projectId, from, to }, controller.signal),
-      fetchRecentQaTries(projectId, RECENT_RUN_COUNT, controller.signal),
+      fetchQaStats({ projectId: one, from, to }, controller.signal),
+      // `GET /api/qa-tries`는 프로젝트를 요구한다. 목록이라 합산할 대상이 아니어서
+      // ARTEL-750 이 넓히지 않았고, 그래서 전체를 고르면 최근 런 자리가 빈다.
+      one === null ? Promise.resolve([]) : fetchRecentQaTries(one, RECENT_RUN_COUNT, controller.signal),
     ])
       .then(([stats, runs]) => {
         setData({ stats, runs })
@@ -114,26 +121,13 @@ export function QaStatsDashboard({
         <h1 className="topbar__brand">ARTEL Admin · QA 실행 설정</h1>
         {nav}
 
-        <span className="field">
-          <label className="field__label" htmlFor={projectFieldId}>
-            프로젝트
-          </label>
-          <select
-            className="control"
-            id={projectFieldId}
-            value={projectId ?? ''}
-            disabled={projects === null || projects.length === 0}
-            onChange={(event) => setProjectId(event.target.value)}
-          >
-            {projects === null && <option value="">불러오는 중…</option>}
-            {projects?.length === 0 && <option value="">참여 중인 프로젝트 없음</option>}
-            {projects?.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.name}
-              </option>
-            ))}
-          </select>
-        </span>
+        <ProjectPicker
+          projects={projects}
+          value={projectId}
+          onChange={(next) => setProjectId(next)}
+          allowAll
+          allLabel={seesAllProjects ? '전체 프로젝트' : '참여 중인 전체'}
+        />
 
         <span className="field">
           <label className="field__label" htmlFor={fromFieldId}>
@@ -228,7 +222,14 @@ export function QaStatsDashboard({
 
             <ScoreBreakdown cells={cells} />
             <CombinationMatrix cells={cells} />
-            <RecentRuns runs={data.runs} />
+            {projectId === ALL_PROJECTS ? (
+              <p className="muted">
+                최근 런은 프로젝트를 하나 골라야 나옵니다. 이 목록은 합산하는 집계가 아니라 런
+                하나하나라, 전체를 고르면 어느 프로젝트의 런인지 줄마다 달라 표가 읽히지 않습니다.
+              </p>
+            ) : (
+              <RecentRuns runs={data.runs} />
+            )}
           </>
         )}
 

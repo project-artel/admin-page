@@ -13,7 +13,8 @@ import type {
 } from './knowledgeStatsTypes'
 
 export interface KnowledgeStatsQuery {
-  projectId: string
+  /** null이면 볼 수 있는 전 프로젝트를 합산한다(ARTEL-750). */
+  projectId: string | null
   from: Date
   to: Date
 }
@@ -31,16 +32,14 @@ export async function fetchKnowledgeStats(
   { projectId, from, to }: KnowledgeStatsQuery,
   signal?: AbortSignal,
 ): Promise<KnowledgeStats> {
-  const params = new URLSearchParams({
-    projectId,
-    from: from.toISOString(),
-    to: to.toISOString(),
-  })
+  const params = new URLSearchParams({ from: from.toISOString(), to: to.toISOString() })
+  // 생략하면 전 프로젝트 합산이다. 빈 문자열은 프로젝트 id 로 읽혀 400 이 된다.
+  if (projectId !== null) params.set('projectId', projectId)
   const response = await apiFetch(`/api/knowledge-stats?${params}`, { signal })
   const body = asRecord(await readJson(response))
 
   return {
-    projectId: asString(body.projectId, 'projectId'),
+    projectId: typeof body.projectId === 'string' ? body.projectId : null,
     from: asString(body.from, 'from'),
     to: asString(body.to, 'to'),
     total: parseTotals(asRecord(body.total)),

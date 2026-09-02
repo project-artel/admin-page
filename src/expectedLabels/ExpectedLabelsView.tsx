@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useId, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { ApiError, UnauthorizedError } from '../api/orchestration'
 import { listProjects, type ProjectSummary } from '../projects/projectsApi'
+import { ProjectPicker } from '../projects/ProjectPicker'
 import { StepLabelList } from './StepLabelList'
 import {
   fetchScenario,
@@ -25,8 +26,11 @@ import './labels.css'
 export function ExpectedLabelsView({
   onSessionLost,
   nav,
+  seesAllProjects,
 }: {
   onSessionLost: () => void
+  /** `DEVELOPER` 등급인지. 선택기가 전 프로젝트를 부를지 고르는 데만 쓴다. */
+  seesAllProjects: boolean
   nav?: ReactNode
 }) {
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null)
@@ -39,7 +43,6 @@ export function ExpectedLabelsView({
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
-  const projectFieldId = useId()
 
   const fail = useCallback(
     (cause: unknown) => {
@@ -54,7 +57,7 @@ export function ExpectedLabelsView({
 
   useEffect(() => {
     const controller = new AbortController()
-    listProjects(controller.signal)
+    listProjects(seesAllProjects, controller.signal)
       .then((items) => {
         setProjects(items)
         setProjectId((current) => current ?? items[0]?.id ?? null)
@@ -65,7 +68,7 @@ export function ExpectedLabelsView({
         fail(cause)
       })
     return () => controller.abort()
-  }, [fail])
+  }, [fail, seesAllProjects])
 
   useEffect(() => {
     if (projectId === null) return
@@ -148,24 +151,7 @@ export function ExpectedLabelsView({
           정해 두면 그 전략이 최악 점수가 됩니다. 스텝 본문은 여기서 고칠 수 없습니다.
         </p>
 
-        <div className="field">
-          <label className="field__label" htmlFor={projectFieldId}>
-            프로젝트
-          </label>
-          <select
-            id={projectFieldId}
-            className="control"
-            value={projectId ?? ''}
-            disabled={projects === null}
-            onChange={(event) => setProjectId(event.target.value || null)}
-          >
-            {(projects ?? []).map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        <ProjectPicker projects={projects} value={projectId} onChange={(next) => setProjectId(next)} />
 
         {error !== null && <p className="notice notice--critical">{error}</p>}
 

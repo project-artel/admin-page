@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useId, useState, type ReactNode } from 'react'
 import { ApiError, UnauthorizedError } from '../api/orchestration'
 import { listProjects, type ProjectSummary } from '../projects/projectsApi'
+import { ALL_PROJECTS } from '../projects/pick'
+import { ProjectPicker } from '../projects/ProjectPicker'
 import { ThemeToggle } from '../qaStats/QaStatsDashboard'
 import { formatCount, toDateInputValue } from '../qaStats/format'
 import { BreakdownTable } from './BreakdownTable'
@@ -14,8 +16,6 @@ import './usage.css'
 const QA_RUN_COUNT = 50
 const DEFAULT_WINDOW_DAYS = 30
 
-/** 전 프로젝트 합산을 고른 상태. 빈 문자열을 쓰면 "아직 안 고름"과 구분되지 않는다. */
-const ALL_PROJECTS = 'all'
 
 /** 로컬 달력 기준 자정. 기간 경계를 UTC로 자르면 한국에서 하루가 밀린다. */
 function startOfDay(date: Date): Date {
@@ -49,8 +49,11 @@ interface Loaded {
 export function LlmUsageDashboard({
   onSessionLost,
   nav,
+  seesAllProjects,
 }: {
   onSessionLost: () => void
+  /** `DEVELOPER` 등급인지. 선택기가 전 프로젝트를 부를지 고르는 데만 쓴다. */
+  seesAllProjects: boolean
   /** 화면 전환 탭. 대시보드가 자기 topbar를 가지고 있어 여기로 받아 끼운다. */
   nav?: ReactNode
 }) {
@@ -64,7 +67,6 @@ export function LlmUsageDashboard({
   const [loading, setLoading] = useState(false)
   const [reloadToken, setReloadToken] = useState(0)
 
-  const scopeFieldId = useId()
   const fromFieldId = useId()
   const toFieldId = useId()
 
@@ -81,7 +83,7 @@ export function LlmUsageDashboard({
 
   useEffect(() => {
     const controller = new AbortController()
-    listProjects(controller.signal)
+    listProjects(seesAllProjects, controller.signal)
       .then(setProjects)
       .catch((cause) => {
         if (controller.signal.aborted) return
@@ -89,7 +91,7 @@ export function LlmUsageDashboard({
         fail(cause)
       })
     return () => controller.abort()
-  }, [fail])
+  }, [fail, seesAllProjects])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -121,24 +123,13 @@ export function LlmUsageDashboard({
         <h1 className="topbar__brand">ARTEL Admin · 토큰 사용량</h1>
         {nav}
 
-        <span className="field">
-          <label className="field__label" htmlFor={scopeFieldId}>
-            프로젝트
-          </label>
-          <select
-            className="control"
-            id={scopeFieldId}
-            value={scope}
-            onChange={(event) => setScope(event.target.value)}
-          >
-            <option value={ALL_PROJECTS}>참여 중인 전체</option>
-            {projects?.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.name}
-              </option>
-            ))}
-          </select>
-        </span>
+        <ProjectPicker
+          projects={projects}
+          value={scope}
+          onChange={setScope}
+          allowAll
+          allLabel={seesAllProjects ? '전체 프로젝트' : '참여 중인 전체'}
+        />
 
         <span className="field">
           <label className="field__label" htmlFor={fromFieldId}>
@@ -209,7 +200,9 @@ export function LlmUsageDashboard({
             <div className="notice" role="note">
               <p className="notice__title">이 숫자가 덮는 범위</p>
               {scope === ALL_PROJECTS
-                ? '참여 중인 프로젝트 전체의 지출입니다. 관리자 role이 없어 배포 전체가 아닙니다.'
+                ? seesAllProjects
+                  ? '삭제되지 않은 전 프로젝트의 지출입니다.'
+                  : '참여 중인 프로젝트 전체의 지출입니다. 개발자 등급이 아니라 배포 전체가 아닙니다.'
                 : '고른 프로젝트 하나의 지출입니다.'}{' '}
               기간은 <strong>모델을 호출한 시각</strong> 기준입니다 — agent가 사용량을 모아 보내므로
               저장 시각과는 분 단위로 벌어지고, 월 경계에서는 날짜가 달라집니다.

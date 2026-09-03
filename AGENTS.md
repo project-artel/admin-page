@@ -33,6 +33,31 @@ For tracked Git work, follow:
 Use project-local skills when installed and applicable. Skill instructions
 define their own triggers, formats, and output paths.
 
+## Logged-in screens
+
+This page carries the same `artel-home` session cookie as artel-home — there is
+no separate admin token — and there is no way to log in locally without a
+registered GitHub OAuth app. For a screenshot against a running stack, mint the
+session instead.
+
+```bash
+.claude/skills/artel-jwt/mint-jwt.py --sub <app_user.id> --ttl 8h --format browser
+```
+
+That prints a `document.cookie = ...` line to paste into the DevTools console.
+Give it a TTL longer than the 15-minute default or the session expires
+mid-capture; `--format playwright` prints the same cookie for a driven browser.
+
+**The panels that read across every project need the grade, not the token.**
+`app_user.platform_role` must be `DEVELOPER`, read from the database on every
+call, so no claim in the token can stand in for it.
+
+```sql
+UPDATE app_user SET platform_role = 'DEVELOPER' WHERE id = <app_user.id>;
+```
+
+The `artel-jwt` skill covers the rest. It mints for a local server only.
+
 ## Terminology in comments, documents, and pull requests
 
 Keep a technical term in English, in backticks, even in the middle of a Korean

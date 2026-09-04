@@ -85,6 +85,14 @@ export type QaStatsTotals = Omit<
 export interface QaStats {
   /** 물어본 프로젝트. 전체 합산으로 부르면 null 이다. */
   projectId: string | null
+  /**
+   * 물어본 `label`. `testRunId`와 별개의 필터라 함께 실릴 수 있다 — 값을 안 실었으면 null이다.
+   *
+   * `qa_run`의 자유 문자열 컬럼이고, 여기 적히는 것은 실험 묶음 이름뿐이다. 그 실험의 arm이
+   * 무엇인지는 `run_config`의 `content_map_mode` · `knowledge_mode`가 이미 말하므로 이름에 또
+   * 적지 않는다 — 같은 사실이 두 군데 적히면 언젠가 어긋난다.
+   */
+  label: string | null
   from: string
   to: string
   total: QaStatsTotals

@@ -21,6 +21,22 @@ export interface QaStatsQuery {
   projectId: string | null
   from: Date
   to: Date
+  /**
+   * null이면 모든 `test run`의 `qa run`을 합산한다.
+   *
+   * `qa_try.qa_run_id`가 nullable이라 어느 `test run`에도 속하지 않는 단독 실행 `qa run`이
+   * 있다 — `testRunId`를 실으면 그 런들이 이 집계에서 빠진다. 그래서 이 필드의 기본값은
+   * 반드시 null(전체)이어야 한다.
+   */
+  testRunId: string | null
+  /**
+   * null이면 모든 `label`의 `qa run`을 합산한다. `testRunId`와 독립이라 함께 실을 수 있다 —
+   * "1차 실험의 9013 런"처럼 둘 다 좁히는 질문이 실제로 나온다.
+   *
+   * `label`도 `qa_run` 컬럼이라 단독 실행 `qa run`에는 없다. `testRunId`와 같은 이유로 기본값은
+   * 반드시 null(전체)이어야 한다.
+   */
+  label: string | null
 }
 
 /**
@@ -30,18 +46,25 @@ export interface QaStatsQuery {
  * 매트릭스도 이 셀의 부분합이라, 사용자가 축을 바꿔도 왕복이 생기지 않는다.
  */
 export async function fetchQaStats(
-  { projectId, from, to }: QaStatsQuery,
+  { projectId, from, to, testRunId, label }: QaStatsQuery,
   signal?: AbortSignal,
 ): Promise<QaStats> {
   const params = new URLSearchParams({ from: from.toISOString(), to: to.toISOString() })
   // 생략하면 서버가 볼 수 있는 전 프로젝트를 합산한다(ARTEL-750). 빈 문자열을 실으면 그것이
   // 프로젝트 id 로 읽혀 400 이 된다.
   if (projectId !== null) params.set('projectId', projectId)
+  // 생략하면 모든 test run을 합산한다. 빈 문자열을 실으면 그것이 testRunId로 읽혀 400이
+  // 된다 — projectId와 같은 규칙이다.
+  if (testRunId !== null) params.set('testRunId', testRunId)
+  // testRunId와 독립인 필터라 따로 싣는다. 빈 문자열을 실으면 그것이 label로 읽혀 400이
+  // 된다 — projectId·testRunId와 같은 규칙이다.
+  if (label !== null) params.set('label', label)
   const response = await apiFetch(`/api/qa-stats?${params}`, { signal })
   const body = asRecord(await readJson(response))
 
   return {
     projectId: typeof body.projectId === 'string' ? body.projectId : null,
+    label: asNullableString(body.label),
     from: asString(body.from, 'from'),
     to: asString(body.to, 'to'),
     total: parseTotals(asRecord(body.total)),
@@ -96,6 +119,32 @@ function parseCell(raw: Record<string, unknown>): QaStatsCell {
     agentArch: asNullableString(raw.agentArch),
     ...parseTotals(raw),
   }
+}
+
+/**
+ * 이미 쓰인 `label` 목록. 최근에 쓰인 것부터, 최대 200개.
+ *
+ * 자유 입력을 막고 이 목록에서 고르게 하려고 부른다 — `content map 1차`와
+ * `content map 1차 실험`이 자유 문자열로는 두 칸으로 갈리는데, 목록에서 고르게 하면
+ * tag 체계를 새로 만들지 않고도 그것이 막힌다. 새 이름을 짓는 자리는 여기가 아니라 런을
+ * 걸 때다.
+ *
+ * `projectId`가 null이면 볼 수 있는 전 프로젝트의 `label`을 합쳐 준다. 날짜 창(`from`/`to`)은
+ * 받지 않는다 — 창을 좁혔다고 고르려던 `label`이 목록에서 사라지면 안 되기 때문이다. 그래서
+ * 목록에 있는 `label`을 골라도 현재 창에서 0건일 수 있다.
+ */
+export async function fetchQaLabels(
+  projectId: string | null,
+  signal?: AbortSignal,
+): Promise<string[]> {
+  const params = new URLSearchParams()
+  if (projectId !== null) params.set('projectId', projectId)
+  const response = await apiFetch(`/api/qa-stats/labels?${params}`, { signal })
+  const body = asRecord(await readJson(response))
+
+  return (Array.isArray(body.labels) ? body.labels : []).filter(
+    (label): label is string => typeof label === 'string',
+  )
 }
 
 /**

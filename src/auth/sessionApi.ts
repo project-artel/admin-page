@@ -10,7 +10,12 @@ export interface AdminSession {
    * 열리지 않고, 반대로 이 값이 `USER`라고 해서 화면이 무엇을 감추면 그것은 서버가 이미 하는
    * 일을 두 곳에서 하는 것이 된다.
    */
-  platformRole: 'USER' | 'DEVELOPER'
+  platformRole: 'USER' | 'DEVELOPER' | 'ADMIN'
+  /**
+   * 관리자가 정해 준 임시 비밀번호를 아직 바꾸지 않은 계정. 서버가 이 상태에서는 `/api/auth/me`
+   * 외에 모두 403으로 막으므로, 화면은 호출을 시도하는 대신 artel-home에서 바꾸라고 안내한다.
+   */
+  mustChangePassword: boolean
 }
 
 /**
@@ -34,6 +39,8 @@ export async function getSession(signal?: AbortSignal): Promise<AdminSession | n
     // displayName만 필수다. 나머지가 없다고 로그인 화면으로 돌려보내면 사용자에게 나갈 길이 없다.
     displayName: asString(body.displayName, 'displayName'),
     // 없으면 USER다. 이 필드를 필수로 두면 서버가 조금 옛 버전일 때 로그인이 통째로 막힌다.
-    platformRole: body.platformRole === 'DEVELOPER' ? 'DEVELOPER' : 'USER',
+    platformRole:
+      body.platformRole === 'ADMIN' || body.platformRole === 'DEVELOPER' ? body.platformRole : 'USER',
+    mustChangePassword: body.mustChangePassword === true,
   }
 }

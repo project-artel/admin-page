@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getSession, type AdminSession } from './auth/sessionApi'
 import { ExpectedLabelsView } from './expectedLabels/ExpectedLabelsView'
+import { SettingsView } from './admin/SettingsView'
+import { UsersView } from './admin/UsersView'
 import { KnowledgeGraphDashboard } from './knowledgeGraph/KnowledgeGraphDashboard'
 import { KnowledgeStatsDashboard } from './knowledgeStats/KnowledgeStatsDashboard'
 import { LlmUsageDashboard } from './llmUsage/LlmUsageDashboard'
@@ -36,7 +38,12 @@ type SessionState =
  * 덮는다 — 시나리오 작성과 임베딩은 저기 안 나온다. 한 화면에 섞으면 합이 맞아 보이는 두 표가
  * 나란히 놓인다.
  */
-type View = 'qa' | 'knowledge' | 'graph' | 'labels' | 'usage'
+type View = 'qa' | 'knowledge' | 'graph' | 'labels' | 'usage' | 'users' | 'settings'
+
+/**
+ * `users`와 `settings`는 앞의 화면들과 달리 **읽는** 화면이 아니라 이 설치를 운영하는 화면이다.
+ * `ADMIN`에게만 탭을 보여 준다. `DEVELOPER`는 지금의 읽기 전용 패널을 그대로 쓴다.
+ */
 
 export function App() {
   const [session, setSession] = useState<SessionState>({ kind: 'checking' })
@@ -70,17 +77,28 @@ export function App() {
     return <SignInBoundary />
   }
 
-  const nav = <ViewTabs view={view} onChange={setView} />
-  // 화면이 이 값으로 판단하는 것은 무엇을 요청할지 하나뿐이다. 인가는 서버가 한다.
-  const all = session.user.platformRole === 'DEVELOPER'
+  const isAdmin = session.user.platformRole === 'ADMIN'
 
+  // 임시 비밀번호를 바꾸기 전에는 서버가 `/api/auth/me` 외에 모두 403으로 막는다. 호출을 시도해
+  // 오류 더미를 보여 주는 대신, 바꿀 곳을 알려 준다.
+  if (session.user.mustChangePassword) return <PasswordChangeBoundary />
+
+  const nav = <ViewTabs view={view} onChange={setView} isAdmin={isAdmin} />
+  // 화면이 이 값으로 판단하는 것은 무엇을 요청할지 하나뿐이다. 인가는 서버가 한다.
+  const all = session.user.platformRole === 'DEVELOPER' || session.user.platformRole === 'ADMIN'
+
+  // 탭이 숨겨져 있어도 상태가 남아 있을 수 있으므로 화면 쪽에서 한 번 더 닫는다.
+  if (view === 'users' && isAdmin)
+    return <UsersView onSessionLost={signOut} nav={nav} currentUserId={session.user.id} />
+  if (view === 'settings' && isAdmin) return <SettingsView onSessionLost={signOut} nav={nav} />
   if (view === 'qa') return <QaStatsDashboard onSessionLost={signOut} nav={nav} seesAllProjects={all} />
   if (view === 'usage') return <LlmUsageDashboard onSessionLost={signOut} nav={nav} seesAllProjects={all} />
   if (view === 'knowledge')
     return <KnowledgeStatsDashboard onSessionLost={signOut} nav={nav} seesAllProjects={all} />
   if (view === 'graph')
     return <KnowledgeGraphDashboard onSessionLost={signOut} nav={nav} seesAllProjects={all} />
-  return <ExpectedLabelsView onSessionLost={signOut} nav={nav} seesAllProjects={all} />
+  if (view === 'labels') return <ExpectedLabelsView onSessionLost={signOut} nav={nav} seesAllProjects={all} />
+  return <QaStatsDashboard onSessionLost={signOut} nav={nav} seesAllProjects={all} />
 }
 
 const TABS: Array<{ view: View; label: string }> = [
@@ -91,6 +109,11 @@ const TABS: Array<{ view: View; label: string }> = [
   { view: 'labels', label: '기대 판정 라벨' },
 ]
 
+const ADMIN_TABS: Array<{ view: View; label: string }> = [
+  { view: 'users', label: '사용자' },
+  { view: 'settings', label: '설정' },
+]
+
 /**
  * 화면 전환.
  *
@@ -99,10 +122,19 @@ const TABS: Array<{ view: View; label: string }> = [
  *
  * 선택 상태를 색이 아니라 `aria-pressed`로도 말한다.
  */
-function ViewTabs({ view, onChange }: { view: View; onChange: (next: View) => void }) {
+function ViewTabs({
+  view,
+  onChange,
+  isAdmin,
+}: {
+  view: View
+  onChange: (next: View) => void
+  isAdmin: boolean
+}) {
+  const tabs = isAdmin ? [...TABS, ...ADMIN_TABS] : TABS
   return (
     <span className="field" role="group" aria-label="화면 선택">
-      {TABS.map((tab) => (
+      {tabs.map((tab) => (
         <button
           key={tab.view}
           type="button"
@@ -133,6 +165,23 @@ function SignInBoundary() {
           ARTEL 세션으로 로그인한 뒤 이 페이지를 새로고침하세요.{' '}
           <a className="link" href={homeUrl}>
             artel-home에서 로그인
+          </a>
+        </p>
+      </div>
+    </div>
+  )
+}
+
+/** 임시 비밀번호가 남은 계정. 비밀번호 변경 화면은 artel-home에만 있다. */
+function PasswordChangeBoundary() {
+  return (
+    <div className="boundary">
+      <div className="boundary__inner notice">
+        <p className="notice__title">비밀번호를 먼저 바꿔야 합니다</p>
+        <p>
+          관리자가 정해 준 임시 비밀번호를 쓰고 있습니다. 바꾸기 전에는 이 페이지를 쓸 수 없습니다.{' '}
+          <a className="link" href={homeUrl}>
+            artel-home에서 비밀번호 변경
           </a>
         </p>
       </div>

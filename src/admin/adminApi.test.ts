@@ -2,6 +2,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   AdminApiError,
   checkBedrockModels,
+  checkClaudeModels,
+  getClaudeSettings,
+  parseClaudeSettings,
+  putClaudeKey,
   checkLlmModels,
   getBedrockSettings,
   invalidateLlmCache,
@@ -194,6 +198,8 @@ describe('admin llm model endpoints', () => {
       updatedAt: null,
     })
     expect(parseAdminLlmModel({ id: 'bedrock/x' }).route).toBe('bedrock')
+    expect(parseAdminLlmModel({ id: 'claude/claude-opus-5-5' }).route).toBe('claude')
+    expect(parseAdminLlmModel({ id: 'claude/x', route: 'claude' }).route).toBe('claude')
   })
 
   it('lists rows from a bare array or an items wrapper', async () => {
@@ -287,6 +293,78 @@ describe('Bedrock key endpoints', () => {
     expect(init.method).toBe('POST')
     expect(check.models.map((model) => model.reachable)).toEqual([true, false])
     expect(check.models[1].error).toBe('not available')
+  })
+})
+
+describe('Claude API key endpoints', () => {
+  const claudeBody = {
+    configured: true,
+    maskedKey: '…wxyz',
+    updatedAt: '2026-10-14T00:00:00Z',
+    lastCheck: {
+      checkedAt: '2026-10-14T00:01:00Z',
+      keyConfigured: true,
+      keyValid: true,
+      models: [
+        { id: 'claude/claude-opus-5-5', reachable: true, error: null },
+        { id: 'claude/claude-haiku-5-5', reachable: false, error: 'model not in list' },
+      ],
+    },
+  }
+
+  it('parses settings with the last check', () => {
+    expect(parseClaudeSettings(claudeBody)).toEqual(claudeBody)
+  })
+
+  it('falls back to safe values for a malformed body', () => {
+    expect(parseClaudeSettings({ lastCheck: 'x' })).toEqual({
+      configured: false,
+      maskedKey: null,
+      updatedAt: null,
+      lastCheck: null,
+    })
+    const check = parseClaudeSettings({ lastCheck: { models: [{ id: 'm', reachable: 'yes' }] } }).lastCheck
+    expect(check?.keyConfigured).toBe(false)
+    expect(check?.models[0]).toEqual({ id: 'm', reachable: false, error: null })
+  })
+
+  it('treats only an explicit false as a rejected key', () => {
+    expect(parseClaudeSettings({ lastCheck: { keyConfigured: true, keyValid: false } }).lastCheck?.keyValid).toBe(false)
+    expect(parseClaudeSettings({ lastCheck: { keyConfigured: true } }).lastCheck?.keyValid).toBe(true)
+  })
+
+  it('reads settings from the anthropic path', async () => {
+    const fetchMock = stubFetch(claudeBody)
+    expect((await getClaudeSettings()).maskedKey).toBe('…wxyz')
+    expect(fetchMock.mock.calls[0][0]).toBe('http://localhost:8080/api/admin/settings/anthropic')
+  })
+
+  it('saves and deletes the key through PUT', async () => {
+    const fetchMock = stubFetch(claudeBody)
+    await putClaudeKey('sk-ant-abc')
+    await putClaudeKey(null)
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('http://localhost:8080/api/admin/settings/anthropic')
+    expect(init.method).toBe('PUT')
+    expect(JSON.parse(init.body)).toEqual({ apiKey: 'sk-ant-abc' })
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ apiKey: null })
+  })
+
+  it('surfaces invalid_api_key and secrets_key_missing from a save', async () => {
+    stubFetch({ code: 'invalid_api_key', message: 'x' }, 400)
+    await expect(putClaudeKey('abc')).rejects.toMatchObject({ status: 400, code: 'invalid_api_key' })
+    stubFetch({ code: 'secrets_key_missing', message: 'x' }, 409)
+    await expect(putClaudeKey('sk-ant-abc')).rejects.toMatchObject({ status: 409, code: 'secrets_key_missing' })
+  })
+
+  it('posts the check and reads per-model results', async () => {
+    const fetchMock = stubFetch(claudeBody.lastCheck)
+    const check = await checkClaudeModels()
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('http://localhost:8080/api/admin/settings/anthropic/check')
+    expect(init.method).toBe('POST')
+    expect(check.keyValid).toBe(true)
+    expect(check.models.map((model) => model.reachable)).toEqual([true, false])
   })
 })
 

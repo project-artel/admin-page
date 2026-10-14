@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { listLlmModels, replaceLlmModel, setLlmModelEnabled, type AdminLlmModel } from './adminApi'
 import { useAdminFailure } from './useAdminRequest'
 
-const ROUTE_LABEL = { openrouter: 'OpenRouter', bedrock: 'AWS Bedrock' } as const
+const ROUTE_LABEL = { openrouter: 'OpenRouter', bedrock: 'AWS Bedrock', claude: 'Claude API' } as const
 
 export function ModelRow({
   model,

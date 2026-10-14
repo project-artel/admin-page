@@ -11,6 +11,7 @@ import {
 } from './adminApi'
 import { ConfirmButton } from './ConfirmButton'
 import { BedrockKeySection } from './BedrockKeySection'
+import { ClaudeApiKeySection } from './ClaudeApiKeySection'
 import { CacheInvalidationSection } from './CacheInvalidationSection'
 import { LlmModelsSection } from './LlmModelsSection'
 import { useAdminFailure } from './useAdminRequest'
@@ -243,6 +244,8 @@ export function SettingsView({
         </section>
 
         <BedrockKeySection onSessionLost={onSessionLost} />
+
+        <ClaudeApiKeySection onSessionLost={onSessionLost} />
 
         <CacheInvalidationSection onSessionLost={onSessionLost} />
 

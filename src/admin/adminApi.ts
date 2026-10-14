@@ -243,7 +243,7 @@ export async function checkLlmModels(): Promise<LlmKeyCheck> {
   return parseLlmKeyCheck(await readJson(response))
 }
 
-export type LlmModelRoute = 'openrouter' | 'bedrock'
+export type LlmModelRoute = 'openrouter' | 'bedrock' | 'claude'
 
 /** One row of the model catalog. Only `enabled` can be changed from the admin page. */
 export interface AdminLlmModel {
@@ -257,6 +257,13 @@ export interface AdminLlmModel {
   updatedAt: string | null
 }
 
+function parseModelRoute(route: unknown, id: string): LlmModelRoute {
+  if (route === 'bedrock' || route === 'claude') return route
+  if (route !== undefined) return 'openrouter'
+  if (id.startsWith('bedrock/')) return 'bedrock'
+  return id.startsWith('claude/') ? 'claude' : 'openrouter'
+}
+
 export function parseAdminLlmModel(raw: unknown): AdminLlmModel {
   const row = asRecord(raw)
   const id = String(row.id ?? '')
@@ -265,7 +272,7 @@ export function parseAdminLlmModel(raw: unknown): AdminLlmModel {
     label: asNullableString(row.label) ?? id,
     provider: asNullableString(row.provider) ?? '',
     // The server derives the route from the id prefix; do the same when it is missing.
-    route: row.route === 'bedrock' || (row.route === undefined && id.startsWith('bedrock/')) ? 'bedrock' : 'openrouter',
+    route: parseModelRoute(row.route, id),
     enabled: row.enabled === true,
     supportsVision: row.supportsVision === true,
     maxInputTokens: asNullableNumber(row.maxInputTokens),
@@ -363,6 +370,79 @@ export async function putBedrockKey(apiKey: string | null): Promise<BedrockSetti
 export async function checkBedrockModels(): Promise<BedrockCheck> {
   const response = await apiFetch('/api/admin/settings/bedrock/check', { method: 'POST' })
   return parseBedrockCheck(await readJson(response))
+}
+
+/** One Claude model the check looked up in the Anthropic model list. `error` is the provider's message or the transport error. */
+export interface ClaudeModelCheck {
+  id: string
+  reachable: boolean
+  error: string | null
+}
+
+export interface ClaudeCheck {
+  checkedAt: string | null
+  keyConfigured: boolean
+  /** Whether the Anthropic API accepted the key. `false` means it answered 401. */
+  keyValid: boolean
+  models: ClaudeModelCheck[]
+}
+
+export interface ClaudeSettings {
+  configured: boolean
+  /** The server's masked tail. The full key is never sent. */
+  maskedKey: string | null
+  updatedAt: string | null
+  lastCheck: ClaudeCheck | null
+}
+
+export function parseClaudeCheck(raw: unknown): ClaudeCheck {
+  const record = asRecord(raw)
+  return {
+    checkedAt: asNullableString(record.checkedAt),
+    keyConfigured: record.keyConfigured === true,
+    // Only an explicit false is a rejection; a missing field must not show the key as rejected.
+    keyValid: record.keyValid !== false,
+    models: Array.isArray(record.models)
+      ? record.models.map((entry) => {
+          const row = asRecord(entry)
+          return {
+            id: String(row.id ?? ''),
+            reachable: row.reachable === true,
+            error: asNullableString(row.error),
+          }
+        })
+      : [],
+  }
+}
+
+export function parseClaudeSettings(body: unknown): ClaudeSettings {
+  const record = asRecord(body)
+  const lastCheck = record.lastCheck
+  return {
+    configured: record.configured === true,
+    maskedKey: asNullableString(record.maskedKey),
+    updatedAt: asNullableString(record.updatedAt),
+    lastCheck: typeof lastCheck === 'object' && lastCheck !== null ? parseClaudeCheck(lastCheck) : null,
+  }
+}
+
+export async function getClaudeSettings(signal?: AbortSignal): Promise<ClaudeSettings> {
+  return parseClaudeSettings(await readJson(await apiFetch('/api/admin/settings/anthropic', { signal })))
+}
+
+/** Sets the key, or deletes it (and the last check) when `apiKey` is `null`. */
+export async function putClaudeKey(apiKey: string | null): Promise<ClaudeSettings> {
+  const response = await apiFetch('/api/admin/settings/anthropic', {
+    method: 'PUT',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ apiKey }),
+  })
+  return parseClaudeSettings(await readJson(response))
+}
+
+export async function checkClaudeModels(): Promise<ClaudeCheck> {
+  const response = await apiFetch('/api/admin/settings/anthropic/check', { method: 'POST' })
+  return parseClaudeCheck(await readJson(response))
 }
 
 export interface CacheInvalidation {

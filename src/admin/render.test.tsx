@@ -1,8 +1,9 @@
 import type { ReactElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
-import { invalidationMessage, replaceLlmModel, type AdminLlmModel, type BedrockSettings } from './adminApi'
+import { invalidationMessage, replaceLlmModel, type AdminLlmModel, type BedrockSettings, type ClaudeSettings } from './adminApi'
 import { BedrockCheckResult, BedrockFacts } from './BedrockKeySection'
+import { ClaudeCheckResult, ClaudeFacts } from './ClaudeApiKeySection'
 import { ModelRow } from './LlmModelsSection'
 import { TemporaryPasswordNotice } from './TemporaryPasswordNotice'
 
@@ -49,6 +50,29 @@ describe('ModelRow', () => {
     const label = tree.props.children[2] as ReactElement<{ children: ReactElement<{ onChange: (e: unknown) => void }>[] }>
     label.props.children[0].props.onChange({ target: { checked: true } })
     expect(onToggle).toHaveBeenCalledWith(true)
+  })
+})
+
+describe('ModelRow for the Claude API route', () => {
+  it('shows the Claude API badge', () => {
+    const html = renderToStaticMarkup(
+      <ModelRow
+        model={{
+          id: 'claude/claude-opus-5-5',
+          label: 'Claude Opus 5.5 (Claude API)',
+          provider: 'anthropic',
+          route: 'claude',
+          enabled: false,
+          supportsVision: true,
+          maxInputTokens: 872000,
+          updatedAt: null,
+        }}
+        pending={false}
+        onToggle={() => undefined}
+      />,
+    )
+    expect(html).toContain('Claude API</span>')
+    expect(html).toContain('872,000')
   })
 })
 
@@ -112,6 +136,61 @@ describe('Bedrock key section parts', () => {
     const html = renderToStaticMarkup(<BedrockCheckResult check={{ checkedAt: null, keyConfigured: false, models: [] }} />)
     expect(html).toContain('키를 먼저 설정')
     expect(html).not.toContain('<table')
+  })
+})
+
+describe('Claude API key section parts', () => {
+  const settings: ClaudeSettings = { configured: true, maskedKey: '…wxyz', updatedAt: null, lastCheck: null }
+
+  it('shows the masked key and the saved time', () => {
+    const html = renderToStaticMarkup(
+      <ClaudeFacts settings={{ ...settings, updatedAt: '2026-10-14T00:00:00Z' }} />,
+    )
+    expect(html).toContain('…wxyz')
+    expect(html).toContain('저장 시각')
+  })
+
+  it('shows 없음 when no key is stored', () => {
+    const html = renderToStaticMarkup(<ClaudeFacts settings={{ ...settings, configured: false, maskedKey: null }} />)
+    expect(html).toContain('없음')
+    expect(html).not.toContain('저장 시각')
+  })
+
+  it('lists reachable models and the error text of the others', () => {
+    const html = renderToStaticMarkup(
+      <ClaudeCheckResult
+        check={{
+          checkedAt: null,
+          keyConfigured: true,
+          keyValid: true,
+          models: [
+            { id: 'claude/a', reachable: true, error: null },
+            { id: 'claude/b', reachable: false, error: 'model not in list' },
+          ],
+        }}
+      />,
+    )
+    expect(html).toContain('2개 중 1개')
+    expect(html).toContain('접근 가능')
+    expect(html).toContain('model not in list')
+    expect(html).not.toContain('키가 거절되었습니다')
+  })
+
+  it('shows the rejected key state instead of a model table', () => {
+    const html = renderToStaticMarkup(
+      <ClaudeCheckResult check={{ checkedAt: null, keyConfigured: true, keyValid: false, models: [] }} />,
+    )
+    expect(html).toContain('키가 거절되었습니다')
+    expect(html).toContain('role="alert"')
+    expect(html).not.toContain('<table')
+  })
+
+  it('says so when no key is stored for the check', () => {
+    const html = renderToStaticMarkup(
+      <ClaudeCheckResult check={{ checkedAt: null, keyConfigured: false, keyValid: true, models: [] }} />,
+    )
+    expect(html).toContain('키를 먼저 설정')
+    expect(html).not.toContain('키가 거절되었습니다')
   })
 })
 

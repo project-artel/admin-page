@@ -9,7 +9,7 @@ const CODE_MESSAGE: Record<string, string> = {
   login_email_missing:
     'GitHub로만 로그인하는 계정이라 비밀번호가 없습니다. 비밀번호를 초기화할 수 없습니다.',
   secrets_key_missing:
-    '서버에 ARTEL_SECRETS_KEY가 없어 이 페이지에서 키를 저장할 수 없습니다. 서버 환경 변수 ARTEL_SECRETS_KEY 또는 OPENROUTER_API_KEY를 설정하세요.',
+    '서버에 ARTEL_SECRETS_KEY가 없어 이 페이지에서 키를 저장할 수 없습니다. 서버 환경 변수 ARTEL_SECRETS_KEY를 설정하세요.',
   invalid_api_key: '키 형식이 올바르지 않습니다. 붙여 넣은 값을 확인하세요.',
   email_taken: '이미 이 이메일로 만든 계정이 있습니다.',
   invalid_email: '이메일 형식이 올바르지 않습니다.',

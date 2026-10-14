@@ -1,6 +1,7 @@
 import {
   ApiError,
   apiFetch,
+  asNullableNumber,
   asNullableString,
   asRecord,
   asString,
@@ -46,7 +47,7 @@ export interface CreateUserRequest {
   platformRole: PlatformRole
 }
 
-export type LlmKeySource = 'admin' | 'environment' | 'none'
+export type LlmKeySource = 'admin' | 'none'
 
 export type LlmCheckError = 'no_key' | 'invalid_key' | 'upstream_unavailable'
 
@@ -73,7 +74,6 @@ export interface LlmSettings {
   /** A stored key exists but cannot be decrypted, so it must be set again. */
   adminKeyUnreadable: boolean
   adminKeyUpdatedAt: string | null
-  environmentKeyPresent: boolean
   /** False when `ARTEL_SECRETS_KEY` is missing, so the admin page cannot store a key. */
   secretsKeyConfigured: boolean
   lastCheck: LlmKeyCheck | null
@@ -179,7 +179,8 @@ export async function updateAdminUser(
 }
 
 function parseSource(value: unknown): LlmKeySource {
-  return value === 'admin' || value === 'environment' ? value : 'none'
+  // The server no longer reads an environment variable, so anything but `admin` means no key.
+  return value === 'admin' ? value : 'none'
 }
 
 function parseStringList(value: unknown): string[] {
@@ -214,7 +215,6 @@ export function parseLlmSettings(body: unknown): LlmSettings {
     adminKeyStored: record.adminKeyStored === true,
     adminKeyUnreadable: record.adminKeyUnreadable === true,
     adminKeyUpdatedAt: asNullableString(record.adminKeyUpdatedAt),
-    environmentKeyPresent: record.environmentKeyPresent === true,
     // Missing means an older server that never needed the key; do not block saving.
     secretsKeyConfigured: record.secretsKeyConfigured !== false,
     lastCheck: typeof lastCheck === 'object' && lastCheck !== null ? parseLlmKeyCheck(lastCheck) : null,
@@ -241,4 +241,151 @@ export async function putLlmKey(apiKey: string | null): Promise<LlmSettings> {
 export async function checkLlmModels(): Promise<LlmKeyCheck> {
   const response = await apiFetch('/api/admin/settings/llm/check', { method: 'POST' })
   return parseLlmKeyCheck(await readJson(response))
+}
+
+export type LlmModelRoute = 'openrouter' | 'bedrock'
+
+/** One row of the model catalog. Only `enabled` can be changed from the admin page. */
+export interface AdminLlmModel {
+  id: string
+  label: string
+  provider: string
+  route: LlmModelRoute
+  enabled: boolean
+  supportsVision: boolean
+  maxInputTokens: number | null
+  updatedAt: string | null
+}
+
+export function parseAdminLlmModel(raw: unknown): AdminLlmModel {
+  const row = asRecord(raw)
+  const id = String(row.id ?? '')
+  return {
+    id,
+    label: asNullableString(row.label) ?? id,
+    provider: asNullableString(row.provider) ?? '',
+    // The server derives the route from the id prefix; do the same when it is missing.
+    route: row.route === 'bedrock' || (row.route === undefined && id.startsWith('bedrock/')) ? 'bedrock' : 'openrouter',
+    enabled: row.enabled === true,
+    supportsVision: row.supportsVision === true,
+    maxInputTokens: asNullableNumber(row.maxInputTokens),
+    updatedAt: asNullableString(row.updatedAt),
+  }
+}
+
+export async function listLlmModels(signal?: AbortSignal): Promise<AdminLlmModel[]> {
+  const body = await readJson(await apiFetch('/api/admin/llm-models', { signal }))
+  const items = Array.isArray(body) ? body : asRecord(body).items
+  return Array.isArray(items) ? items.map(parseAdminLlmModel) : []
+}
+
+/** The id goes in the body because model ids contain `/` and `:`. Answers the updated row. */
+export async function setLlmModelEnabled(id: string, enabled: boolean): Promise<AdminLlmModel> {
+  const response = await apiFetch('/api/admin/llm-models', {
+    method: 'PATCH',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ id, enabled }),
+  })
+  return parseAdminLlmModel(await readJson(response))
+}
+
+/** Replaces the row with the same id, leaving every other row as it was. */
+export function replaceLlmModel(models: AdminLlmModel[], updated: AdminLlmModel): AdminLlmModel[] {
+  return models.map((model) => (model.id === updated.id ? updated : model))
+}
+
+/** One Bedrock model the check called. `error` is the provider's message or the transport error. */
+export interface BedrockModelCheck {
+  id: string
+  reachable: boolean
+  error: string | null
+}
+
+export interface BedrockCheck {
+  checkedAt: string | null
+  keyConfigured: boolean
+  models: BedrockModelCheck[]
+}
+
+export interface BedrockSettings {
+  configured: boolean
+  /** The server's masked tail such as `…abcd`. The full key is never sent. */
+  maskedKey: string | null
+  updatedAt: string | null
+  region: string | null
+  lastCheck: BedrockCheck | null
+}
+
+export function parseBedrockCheck(raw: unknown): BedrockCheck {
+  const record = asRecord(raw)
+  return {
+    checkedAt: asNullableString(record.checkedAt),
+    keyConfigured: record.keyConfigured === true,
+    models: Array.isArray(record.models)
+      ? record.models.map((entry) => {
+          const row = asRecord(entry)
+          return {
+            id: String(row.id ?? ''),
+            reachable: row.reachable === true,
+            error: asNullableString(row.error),
+          }
+        })
+      : [],
+  }
+}
+
+export function parseBedrockSettings(body: unknown): BedrockSettings {
+  const record = asRecord(body)
+  const lastCheck = record.lastCheck
+  return {
+    configured: record.configured === true,
+    maskedKey: asNullableString(record.maskedKey),
+    updatedAt: asNullableString(record.updatedAt),
+    region: asNullableString(record.region),
+    lastCheck: typeof lastCheck === 'object' && lastCheck !== null ? parseBedrockCheck(lastCheck) : null,
+  }
+}
+
+export async function getBedrockSettings(signal?: AbortSignal): Promise<BedrockSettings> {
+  return parseBedrockSettings(await readJson(await apiFetch('/api/admin/settings/bedrock', { signal })))
+}
+
+/** Sets the key, or deletes it (and the last check) when `apiKey` is `null`. */
+export async function putBedrockKey(apiKey: string | null): Promise<BedrockSettings> {
+  const response = await apiFetch('/api/admin/settings/bedrock', {
+    method: 'PUT',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ apiKey }),
+  })
+  return parseBedrockSettings(await readJson(response))
+}
+
+export async function checkBedrockModels(): Promise<BedrockCheck> {
+  const response = await apiFetch('/api/admin/settings/bedrock/check', { method: 'POST' })
+  return parseBedrockCheck(await readJson(response))
+}
+
+export interface CacheInvalidation {
+  agentServerInvalidated: boolean
+  /** Why the agent-server call failed, or `null` when it did not. */
+  error: string | null
+}
+
+export function parseCacheInvalidation(body: unknown): CacheInvalidation {
+  const record = asRecord(body)
+  return {
+    agentServerInvalidated: record.agentServerInvalidated === true,
+    error: asNullableString(record.error),
+  }
+}
+
+export async function invalidateLlmCache(): Promise<CacheInvalidation> {
+  const response = await apiFetch('/api/admin/settings/llm/invalidate-cache', { method: 'POST' })
+  return parseCacheInvalidation(await readJson(response))
+}
+
+export function invalidationMessage(result: CacheInvalidation): string {
+  return result.agentServerInvalidated
+    ? 'agent-server가 캐시를 비웠습니다.'
+    : `agent-server가 캐시를 비우지 못했습니다. ${result.error ?? '원인을 알 수 없습니다.'}`
 }

@@ -10,12 +10,14 @@ import {
   type LlmSettings,
 } from './adminApi'
 import { ConfirmButton } from './ConfirmButton'
+import { BedrockKeySection } from './BedrockKeySection'
+import { CacheInvalidationSection } from './CacheInvalidationSection'
+import { LlmModelsSection } from './LlmModelsSection'
 import { useAdminFailure } from './useAdminRequest'
 import './admin.css'
 
 const SOURCE_LABEL: Record<LlmKeySource, string> = {
   admin: '이 페이지에서 저장한 값',
-  environment: '환경 변수 OPENROUTER_API_KEY',
   none: '설정되지 않음',
 }
 
@@ -142,7 +144,7 @@ export function SettingsView({
             <h2 className="section__title" id="adm-key-title">
               OpenRouter 키
             </h2>
-            <span className="section__note">모든 모델 호출이 이 키 하나를 씁니다.</span>
+            <span className="section__note">OpenRouter 경로로 가는 모델 호출이 이 키를 씁니다.</span>
           </div>
 
           {settings === null ? (
@@ -152,7 +154,7 @@ export function SettingsView({
             {cannotSave && (
               <p className="notice notice--critical" role="alert">
                 <strong>! 이 페이지에서는 키를 저장할 수 없습니다.</strong> 서버에 ARTEL_SECRETS_KEY가 없습니다.
-                서버 환경 변수 OPENROUTER_API_KEY 또는 ARTEL_SECRETS_KEY를 설정하세요.
+                서버 환경 변수 ARTEL_SECRETS_KEY를 설정하세요.
               </p>
             )}
             {settings.adminKeyUnreadable && (
@@ -214,8 +216,8 @@ export function SettingsView({
             )}
           </form>
           <span className="section__note section__note--block" id={`${keyFieldId}-hint`}>
-            저장한 키는 다시 표시되지 않고 끝부분만 가려서 보입니다. 이 페이지의 값이 환경 변수보다
-            먼저 쓰이며, 지우면 환경 변수 값으로 돌아갑니다.
+            저장한 키는 다시 표시되지 않고 끝부분만 가려서 보입니다. 키는 이 페이지에서만 설정하며,
+            지우면 새 키를 입력할 때까지 키가 없는 상태가 됩니다.
           </span>
         </section>
 
@@ -239,6 +241,12 @@ export function SettingsView({
           )}
           {check !== null && <CheckResult check={check} />}
         </section>
+
+        <BedrockKeySection onSessionLost={onSessionLost} />
+
+        <CacheInvalidationSection onSessionLost={onSessionLost} />
+
+        <LlmModelsSection onSessionLost={onSessionLost} />
 
         <p className="adm-visually-hidden" aria-live="polite">
           {announcement}
